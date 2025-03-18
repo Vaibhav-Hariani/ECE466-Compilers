@@ -22,7 +22,7 @@ ast_node* new_ast_num(TypedNumber n) {
 
 ast_node* new_ast_charlit(char c) {
   ast_node* node = new_ast_node;
-  node->type = AST_charlit;
+  node->type = AST_num;
   node->obj.charlit = c;
   return node;
 }
@@ -34,9 +34,19 @@ ast_node* new_ast_string(SizedString s) {
   return node;
 }
 
-ast_node* new_ast_lvalue(ast_node* expr) {
-  expr->is_lval = 1;
-  return expr;
+// ast_node* new_ast_lvalue(ast_node* expr) {
+//   expr->is_lval = 1;
+//   return expr;
+// }
+
+//Clever way to handle array indexing?
+ast_node* new_ast_array(ast_node* expr1, ast_node* expr2){
+  //Keep in mind that this can only be a declarator: Cannot be anything else
+  if (expr2 == 0){
+    return new_ast_unop(expr1, '*',PREFIX);
+  }
+  ast_node* inner_expr = new_ast_binop(AST_binop, expr1, expr2, '+');
+  return new_ast_unop(inner_expr, '*', PREFIX);
 }
 
 
@@ -73,6 +83,7 @@ ast_node* new_ast_binop(int type, ast_node* expr1, ast_node* expr2, int op) {
         exit(1);
       }
       break;
+    
 
     case AST_special:;
       struct special* spec = calloc(1, sizeof(struct special));

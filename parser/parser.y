@@ -19,9 +19,12 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
     MINUSMINUS "--"
 %left ','
 %right '=' PLUSEQ MINUSEQ DIVEQ TIMESEQ MODEQ SHLEQ SHREQ ANDEQ OREQ XOREQ
-%right '?' ':'	/* This is where yacc will put it */
-%left LOGAND LOGOR
-%left '&' '^' '|'
+%right '?' ':'	/* This is where yacc will put it */k
+%left LOGOR
+%left LOGAND
+%left '|'
+%left '^'
+%left '&' 
 %left  EQEQ NOTEQ
 %left GTEQ LTEQ '>' '<'
 %left SHL SHR
@@ -46,7 +49,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 }
 
 
-%nterm <node> expr terminal ast_binop ast_ternop ast_unop ast_assign ast_lvalue 
+%nterm <node> expr terminal ast_binop ast_ternop ast_unop ast_assign ast_list 
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
@@ -65,26 +68,28 @@ terminal: %empty {$$=0;}
 
 
 expr: NUM {$$ = new_ast_num($1);}
+|   IDENT {$$ = new_ast_ident($1);}
 |   CHARLIT {$$ = new_ast_charlit($1);}
 |   STRING {$$ = new_ast_string($1);}
 |   ast_binop {$$ = $1;}
 |   ast_unop {$$ = $1;}
 |   ast_assign {$$=$1;}
-|   ast_lvalue {$$=$1;}
+|   ast_ternop {$$=$1;}
 |   '(' expr ')'            {$$=$2;}
-
 ;
 
 ast_binop: expr '+' expr   { $$=new_ast_binop(AST_binop, $1, $3, '+');}
-|    expr '-' expr   { $$=new_ast_binop(AST_binop, $1, $3, '-');}
-|    expr '*' expr   { $$=new_ast_binop(AST_binop, $1, $3, '*');}
-|    expr '/' expr   { $$=new_ast_binop(AST_binop, $1, $3, '/');}
-|    expr '%' expr   { $$=new_ast_binop(AST_binop, $1, $3, '%');}
-|    expr '>' expr   { $$=new_ast_binop(AST_binop, $1, $3, '>');}
-|    expr '<' expr   { $$=new_ast_binop(AST_binop, $1, $3, '<');}
-|	 expr '&' expr 	 { $$=new_ast_binop(AST_binop, $1, $3, '&');}
-|	 expr '|' expr 	 { $$=new_ast_binop(AST_binop, $1, $3, '|');}
-|    expr '^' expr   { $$=new_ast_binop(AST_binop, $1, $3, '^');}
+|   expr '-' expr   { $$=new_ast_binop(AST_binop, $1, $3, '-');}
+|   expr '*' expr   { $$=new_ast_binop(AST_binop, $1, $3, '*');}
+|   expr '/' expr   { $$=new_ast_binop(AST_binop, $1, $3, '/');}
+|   expr '%' expr   { $$=new_ast_binop(AST_binop, $1, $3, '%');}
+|   expr '>' expr   { $$=new_ast_binop(AST_binop, $1, $3, '>');}
+|   expr '<' expr   { $$=new_ast_binop(AST_binop, $1, $3, '<');}
+|	expr '&' expr 	 { $$=new_ast_binop(AST_binop, $1, $3, '&');}
+|	expr '|' expr 	 { $$=new_ast_binop(AST_binop, $1, $3, '|');}
+|   expr '^' expr   { $$=new_ast_binop(AST_binop, $1, $3, '^');}
+|   expr INDSEL IDENT    { $$=new_ast_binop(AST_binop, $1, new_ast_ident($3), INDSEL);}
+|   expr '.' IDENT  {$$ = new_ast_lvalue(new_ast_binop(AST_binop, $1, new_ast_ident($3), '.'));}
 |   expr SHL expr 	 { $$=new_ast_binop(AST_binop, $1, $3, SHL);}
 |	expr SHR expr 	 { $$=new_ast_binop(AST_binop, $1, $3, SHR);}
 |	expr EQEQ expr 	     { $$=new_ast_binop(AST_binop, $1, $3, EQEQ);}
@@ -93,13 +98,13 @@ ast_binop: expr '+' expr   { $$=new_ast_binop(AST_binop, $1, $3, '+');}
 |	expr LOGOR expr 	 { $$=new_ast_binop(AST_binop, $1, $3, LOGOR);}
 |   expr LTEQ expr 	 { $$=new_ast_binop(AST_binop, $1, $3, LTEQ);}
 |	expr GTEQ expr 	 { $$=new_ast_binop(AST_binop, $1, $3, GTEQ);}
-
 |   expr ',' expr    { $$=new_ast_binop(AST_binop, $1, $3, ',');}
-//Special object type for objects with (potentially) 2 arguments, but aren't actually binops
-|   expr '(' expr ')' { $$=new_ast_binop(AST_special, $1, $3, ')');};
-|   expr '(' ')'    { $$=new_ast_binop(AST_special, $1, 0, ')');};
+//Helper function that should expand this into what it actually is
+|   expr '[' ']' {$$=ast_array_expansion($1, 0)};
+|   expr '[' expr ']'  {$$ =ast_array_expansion($1, $3);}
+//Special function object type: Treated like a binop in the tree but expands out later
+|   expr '('ast_list')' { $$=new_ast_binop(AST_function, $1, $3, 0);};
 ;
-
 
 //separated here so theat lvalues can be handled properly later on in the system
 ast_assign: expr '=' expr   { $$=new_ast_binop(AST_assign, $1, $3, '=');}
@@ -118,6 +123,11 @@ ast_assign: expr '=' expr   { $$=new_ast_binop(AST_assign, $1, $3, '=');}
 
 ast_ternop: expr '?' expr ':' expr {$$=new_ast_ternop(AST_ternop, $1, $3, $5);};
 
+ast_list: %empty {$$ = new_ast_list(0);} 
+|   expr {$$=new_ast_list($1);}
+|   ast_list ',' expr %prec POSTFIX {$$ = append_ast_list($1, $3);}
+;
+
 ast_unop: expr "++" %prec POSTFIX {$$ = new_ast_unop($1, PLUSPLUS, POSTFIX);}
 |   expr "--" %prec POSTFIX {$$ = new_ast_unop($1, MINUSMINUS, POSTFIX);}
 |   "++" expr %prec PREFIX {$$ = new_ast_unop($2, PLUSPLUS, PREFIX);}
@@ -127,17 +137,8 @@ ast_unop: expr "++" %prec POSTFIX {$$ = new_ast_unop($1, PLUSPLUS, POSTFIX);}
 |   '!' expr %prec SIZEOF  {$$ = new_ast_unop($2, '!', PREFIX);}
 |   '~' expr %prec SIZEOF  {$$ = new_ast_unop($2, '~', PREFIX);}
 |   '&' expr %prec SIZEOF  {$$ = new_ast_unop($2, '&', PREFIX);}
+|    '*' expr %prec SIZEOF {$$ = new_ast_unop($2, '*', PREFIX);}
 |   SIZEOF expr {$$ = new_ast_unop($2, SIZEOF, PREFIX);}
-;
-//A hacky way of handling lvalues. They're nodes of other types, but just specified differently 
-ast_lvalue: IDENT {$$ = new_ast_lvalue(new_ast_ident($1));}
-|    '*' expr %prec SIZEOF {$$ = new_ast_lvalue(new_ast_unop($2, '*', PREFIX));}
-|    expr INDSEL IDENT {$$ = new_ast_lvalue(new_ast_binop(AST_special, $1, new_ast_ident($3), INDSEL));}
-|   expr '[' expr ']'  {$$ = new_ast_lvalue(new_ast_binop(AST_special, $1, $3, ']'));}
-//Special case of array creation, for empty arrays.
-|   expr '[' ']'    {$$ = new_ast_lvalue(new_ast_binop(AST_special, $1, 0, ']'));}
-|   expr '.' IDENT  {$$ = new_ast_lvalue(new_ast_binop(AST_special, $1, new_ast_ident($3), '.'));}
-| ast_ternop {$$ = new_ast_lvalue($1);}
 ;
 
 /* keyword: STRUCT IDENT

@@ -90,8 +90,10 @@ ast_node* new_ast_string(SizedString s);
 
 ast_node* new_ast_binop(int type, ast_node* expr1, ast_node* expr2, int op);
 
-//Just sets a flag if desired
-ast_node* new_ast_lvalue(ast_node* expr);
+// //Just sets a flag if desired
+// ast_node* new_ast_lvalue(ast_node* expr);
+
+ast_node* new_ast_array(ast_node* expr1, ast_node* expr2);
 
 
 ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2, ast_node* expr3);
