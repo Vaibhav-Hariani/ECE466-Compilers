@@ -7,20 +7,23 @@ enum node_type {
     AST_binop=0,
     AST_ternop,
     AST_unop,
-    AST_varlen,
-    AST_lvalue,
     AST_assign,
-    AST_special,
+    AST_list,
+    AST_funct,
     AST_ident,
     AST_string,
     AST_charlit,
     AST_num,
-    //Not used particularly, though it's valid for function calls and array definition
-    AST_EMPTY,
 };
 
-
 struct ast_node typedef ast_node;
+
+
+struct list_node {
+    struct ast_node* cur;
+    struct list_node* next;
+};
+
 struct binop {
     ast_node* expr_1;
     ast_node* expr_2;
@@ -45,10 +48,9 @@ struct assign {
 };
 
 //Special struct for function calls
-struct special {
-    ast_node* expr_1;
-    ast_node* expr_2;
-    int opcode;
+struct funct {
+    ast_node* name;
+    struct list_node* args;
 };
 
 
@@ -63,7 +65,8 @@ typedef union ast_node_t {
     struct ternop* t;
     struct unop* u;
     struct assign* a;
-    struct special* s;
+    struct funct* f;
+    struct list_node* l;
     //Non-recursive types can just live here
     char charlit;
     TypedNumber num;
@@ -88,17 +91,19 @@ ast_node* new_ast_charlit(char c);
 
 ast_node* new_ast_string(SizedString s);
 
-ast_node* new_ast_binop(int type, ast_node* expr1, ast_node* expr2, int op);
+ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op);
 
 // //Just sets a flag if desired
 // ast_node* new_ast_lvalue(ast_node* expr);
 
-ast_node* new_ast_array(ast_node* expr1, ast_node* expr2);
+ast_node* ast_array_exp(ast_node* expr1, ast_node* expr2);
+
+ast_node* new_ast_list(ast_node* head);
+ast_node* append_ast_list(ast_node* tail, ast_node* new);
 
 
 ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2, ast_node* expr3);
 
-ast_node* new_ast_unop(ast_node* expr, int op, int dir);
-
+ast_node* new_ast_single(ast_node* expr, int op, int dir);
 
 #endif

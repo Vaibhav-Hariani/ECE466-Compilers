@@ -19,7 +19,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
     MINUSMINUS "--"
 %left ','
 %right '=' PLUSEQ MINUSEQ DIVEQ TIMESEQ MODEQ SHLEQ SHREQ ANDEQ OREQ XOREQ
-%right '?' ':'	/* This is where yacc will put it */k
+%right '?' ':'	/* This is where yacc will put it */
 %left LOGOR
 %left LOGAND
 %left '|'
@@ -49,12 +49,12 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 }
 
 
-%nterm <node> expr terminal ast_binop ast_ternop ast_unop ast_assign ast_list 
+%nterm <node> prog term_expr expr binop_expr ternop_expr unop_expr assign_expr arg_list 
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
 %token <s> STRING;
-%start terminal
+%start prog
 %%
 // 2 types of elements
 // expr, and lvalues
@@ -62,84 +62,84 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 // as such, they can be ternarys, pointers, or identifiers. Nothing else.
 //unops take in an lvalue, and do one of 3 operations to them.
 
-terminal: %empty {$$=0;}
-| terminal expr ';'  {$$ = print_ast($2);}
+prog: %empty {$$=0;}
+| prog term_expr ';'  {$$ = print_ast($2);}
 ;
 
+term_expr: assign_expr {$$=$1;}
+|   term_expr ',' assign_expr {$$ = new_ast_double(AST_binop, $1, $3, ',');} 
 
 expr: NUM {$$ = new_ast_num($1);}
 |   IDENT {$$ = new_ast_ident($1);}
 |   CHARLIT {$$ = new_ast_charlit($1);}
 |   STRING {$$ = new_ast_string($1);}
-|   ast_binop {$$ = $1;}
-|   ast_unop {$$ = $1;}
-|   ast_assign {$$=$1;}
-|   ast_ternop {$$=$1;}
-|   '(' expr ')'            {$$=$2;}
+|   '(' term_expr ')'            {$$=$2;}
 ;
 
-ast_binop: expr '+' expr   { $$=new_ast_binop(AST_binop, $1, $3, '+');}
-|   expr '-' expr   { $$=new_ast_binop(AST_binop, $1, $3, '-');}
-|   expr '*' expr   { $$=new_ast_binop(AST_binop, $1, $3, '*');}
-|   expr '/' expr   { $$=new_ast_binop(AST_binop, $1, $3, '/');}
-|   expr '%' expr   { $$=new_ast_binop(AST_binop, $1, $3, '%');}
-|   expr '>' expr   { $$=new_ast_binop(AST_binop, $1, $3, '>');}
-|   expr '<' expr   { $$=new_ast_binop(AST_binop, $1, $3, '<');}
-|	expr '&' expr 	 { $$=new_ast_binop(AST_binop, $1, $3, '&');}
-|	expr '|' expr 	 { $$=new_ast_binop(AST_binop, $1, $3, '|');}
-|   expr '^' expr   { $$=new_ast_binop(AST_binop, $1, $3, '^');}
-|   expr INDSEL IDENT    { $$=new_ast_binop(AST_binop, $1, new_ast_ident($3), INDSEL);}
-|   expr '.' IDENT  {$$ = new_ast_lvalue(new_ast_binop(AST_binop, $1, new_ast_ident($3), '.'));}
-|   expr SHL expr 	 { $$=new_ast_binop(AST_binop, $1, $3, SHL);}
-|	expr SHR expr 	 { $$=new_ast_binop(AST_binop, $1, $3, SHR);}
-|	expr EQEQ expr 	     { $$=new_ast_binop(AST_binop, $1, $3, EQEQ);}
-|	expr NOTEQ expr 	 { $$=new_ast_binop(AST_binop, $1, $3, NOTEQ);}
-|	expr LOGAND expr 	 { $$=new_ast_binop(AST_binop, $1, $3, LOGAND);}
-|	expr LOGOR expr 	 { $$=new_ast_binop(AST_binop, $1, $3, LOGOR);}
-|   expr LTEQ expr 	 { $$=new_ast_binop(AST_binop, $1, $3, LTEQ);}
-|	expr GTEQ expr 	 { $$=new_ast_binop(AST_binop, $1, $3, GTEQ);}
-|   expr ',' expr    { $$=new_ast_binop(AST_binop, $1, $3, ',');}
+unop_expr: expr {$$=$1;}
+|   unop_expr "++" %prec POSTFIX { $$ = new_ast_single($1, PLUSPLUS, POSTFIX);}
+|   unop_expr "--" %prec POSTFIX { $$ = new_ast_single($1, MINUSMINUS, POSTFIX);}
+|   "++" unop_expr %prec PREFIX  { $$ = new_ast_single($2, PLUSPLUS, PREFIX);}
+|   "--" unop_expr %prec PREFIX  { $$ = new_ast_single($2, MINUSMINUS, PREFIX);}
+|   unop_expr INDSEL IDENT       { $$=new_ast_double(AST_binop, $1, new_ast_ident($3), INDSEL);}
+|   unop_expr '.' IDENT          { $$ = new_ast_double(AST_binop, $1, new_ast_ident($3), '.');}
 //Helper function that should expand this into what it actually is
-|   expr '[' ']' {$$=ast_array_expansion($1, 0)};
-|   expr '[' expr ']'  {$$ =ast_array_expansion($1, $3);}
-//Special function object type: Treated like a binop in the tree but expands out later
-|   expr '('ast_list')' { $$=new_ast_binop(AST_function, $1, $3, 0);};
-;
-
-//separated here so theat lvalues can be handled properly later on in the system
-ast_assign: expr '=' expr   { $$=new_ast_binop(AST_assign, $1, $3, '=');}
-|	expr TIMESEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, TIMESEQ);}
-|	expr DIVEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, DIVEQ);}
-|	expr MODEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, MODEQ);}
-|	expr PLUSEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, PLUSEQ);}
-|	expr MINUSEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, MINUSEQ);}
-|	expr SHLEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, SHLEQ);}
-|	expr SHREQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, SHLEQ);}
-|	expr ANDEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, ANDEQ);}
-|	expr OREQ expr 	     { $$=new_ast_binop(AST_assign, $1, $3, OREQ);}
-|	expr XOREQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, XOREQ);}
+|   unop_expr '['term_expr']'    { $$= ast_array_exp($1,$3);}
+|   unop_expr '(' arg_list ')'   { $$=new_ast_double(AST_funct, $1, $3, ')');}
+|   '+' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '+', PREFIX);}
+|   '-' unop_expr %prec PREFIX   { $$= new_ast_single($2, '-', PREFIX);}
+|   '!' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '!', PREFIX);}
+|   '~' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '~', PREFIX);}
+|   '&' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '&', PREFIX);}
+|    '*' unop_expr %prec SIZEOF  { $$ = new_ast_single($2, '*', PREFIX);}
+|   SIZEOF unop_expr {$$ = new_ast_single($2, SIZEOF, PREFIX);}
 ;
 
 
-ast_ternop: expr '?' expr ':' expr {$$=new_ast_ternop(AST_ternop, $1, $3, $5);};
+binop_expr: unop_expr {$$=$1;}
+|   binop_expr '+' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '+');}
+|   binop_expr '-' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '-');}
+|   binop_expr '*' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '*');}
+|   binop_expr '/' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '/');}
+|   binop_expr '%' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '%');}
+|   binop_expr '>' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '>');}
+|   binop_expr '<' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '<');}
+|	binop_expr '&' binop_expr 	     { $$=new_ast_double(AST_binop, $1, $3, '&');}
+|	binop_expr '|' binop_expr 	     { $$=new_ast_double(AST_binop, $1, $3, '|');}
+|   binop_expr '^' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '^');}
+|   binop_expr SHL binop_expr 	     { $$=new_ast_double(AST_binop, $1, $3, SHL);}
+|	binop_expr SHR binop_expr  	     { $$=new_ast_double(AST_binop, $1, $3, SHR);}
+|	binop_expr EQEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, EQEQ);}
+|	binop_expr NOTEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, NOTEQ);}
+|	binop_expr LOGAND binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, LOGAND);}
+|	binop_expr LOGOR binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, LOGOR);}
+|   binop_expr LTEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, LTEQ);}
+|	binop_expr GTEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, GTEQ);}
 
-ast_list: %empty {$$ = new_ast_list(0);} 
-|   expr {$$=new_ast_list($1);}
-|   ast_list ',' expr %prec POSTFIX {$$ = append_ast_list($1, $3);}
+ternop_expr: binop_expr { $$=$1;}
+| binop_expr '?' binop_expr ':' binop_expr { $$=new_ast_ternop(AST_ternop, $1, $3, $5);};
+
+assign_expr: ternop_expr {$$=$1;}
+|   unop_expr '=' assign_expr      { $$=new_ast_double(AST_assign, $1, $3, '=');}
+|	expr TIMESEQ assign_expr	 { $$=new_ast_double(AST_assign, $1, $3, TIMESEQ);}
+|	expr DIVEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, DIVEQ);}
+|	expr MODEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, MODEQ);}
+|	expr PLUSEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, PLUSEQ);}
+|	expr MINUSEQ assign_expr  { $$=new_ast_double(AST_assign, $1, $3, MINUSEQ);}
+|	expr SHLEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
+|	expr SHREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
+|	expr ANDEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, ANDEQ);}
+|	expr OREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, OREQ);}
+|	expr XOREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, XOREQ);}
 ;
 
-ast_unop: expr "++" %prec POSTFIX {$$ = new_ast_unop($1, PLUSPLUS, POSTFIX);}
-|   expr "--" %prec POSTFIX {$$ = new_ast_unop($1, MINUSMINUS, POSTFIX);}
-|   "++" expr %prec PREFIX {$$ = new_ast_unop($2, PLUSPLUS, PREFIX);}
-|   "--" expr %prec PREFIX {$$ = new_ast_unop($2, MINUSMINUS, PREFIX);}
-|   '+' expr %prec SIZEOF  {$$ = new_ast_unop($2, '+', PREFIX);}
-|   '-' expr %prec PREFIX {$$= new_ast_unop($2, '-', PREFIX);}
-|   '!' expr %prec SIZEOF  {$$ = new_ast_unop($2, '!', PREFIX);}
-|   '~' expr %prec SIZEOF  {$$ = new_ast_unop($2, '~', PREFIX);}
-|   '&' expr %prec SIZEOF  {$$ = new_ast_unop($2, '&', PREFIX);}
-|    '*' expr %prec SIZEOF {$$ = new_ast_unop($2, '*', PREFIX);}
-|   SIZEOF expr {$$ = new_ast_unop($2, SIZEOF, PREFIX);}
+arg_list: %empty { $$ = new_ast_list(0);} 
+|   assign_expr { $$=new_ast_list($1);}
+|   arg_list ',' assign_expr %prec POSTFIX { $$ = append_ast_list($1, $3);}
 ;
+
+
+
 
 /* keyword: STRUCT IDENT
 | CHAR

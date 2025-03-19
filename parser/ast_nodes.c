@@ -34,25 +34,50 @@ ast_node* new_ast_string(SizedString s) {
   return node;
 }
 
-// ast_node* new_ast_lvalue(ast_node* expr) {
-//   expr->is_lval = 1;
-//   return expr;
-// }
+struct list_node* new_list_node(ast_node* head){
+  struct list_node* l = calloc(1,sizeof(struct list_node));
+  l->cur = head;
+  l->next = 0;
+  return l;
+}
 
-//Clever way to handle array indexing?
-ast_node* new_ast_array(ast_node* expr1, ast_node* expr2){
-  //Keep in mind that this can only be a declarator: Cannot be anything else
-  if (expr2 == 0){
-    return new_ast_unop(expr1, '*',PREFIX);
+ast_node* new_ast_list(ast_node* head){
+  struct list_node* l = new_list_node(head);
+  ast_node* node = new_ast_node;
+  node->type=AST_list;
+  node->obj.l = l;
+  return node;
+}
+
+ast_node* append_ast_list(ast_node* root, ast_node* new){
+  if(root->type != AST_list){
+    yyerror("List was not a list");
+    exit(1);
   }
-  ast_node* inner_expr = new_ast_binop(AST_binop, expr1, expr2, '+');
-  return new_ast_unop(inner_expr, '*', PREFIX);
+  struct list_node* head = root->obj.l;
+  
+  if(head->cur == 0){
+    head->cur = new;
+  }
+  struct list_node* tail = new_list_node(new);
+  while(head->next != 0){
+    head = head->next;
+  }
+  head->next = tail;
+  return root;
+}
+
+
+
+ast_node* ast_array_exp(ast_node* expr1, ast_node* expr2){
+  ast_node* inner_expr = new_ast_double(AST_binop, expr1, expr2, '+');
+  return new_ast_single(inner_expr, '*', PREFIX);
 }
 
 
 // Given that both both children of a binop are numbers or char literals, this should convert them into a new numlit/charlit.
 
-ast_node* new_ast_binop(int type, ast_node* expr1, ast_node* expr2, int op) {
+ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op) {
   ast_node* node = new_ast_node;
   struct binop* bin = calloc(1, sizeof(struct binop));
 
@@ -77,21 +102,23 @@ ast_node* new_ast_binop(int type, ast_node* expr1, ast_node* expr2, int op) {
       node->type = AST_assign;
       node->obj.a = obj;
 
-      // hackier lvalue handling
-      if (expr1->is_lval != 1) {
-        yyerror("Expr1 in assignment not an lvalue");
-        exit(1);
-      }
+      // // hackier lvalue handling
+      // if (expr1->is_lval != 1) {
+      //   yyerror("Expr1 in assignment not an lvalue");
+      //   exit(1);
+      // }
       break;
     
-
-    case AST_special:;
-      struct special* spec = calloc(1, sizeof(struct special));
-      spec->expr_1 = expr1;
-      spec->expr_2 = expr2;
-      node->type = AST_special;
-      spec->opcode = op;
-      node->obj.s = spec;
+    case AST_funct:;
+      struct funct* function = calloc(1, sizeof(struct funct));
+      function->name= expr1;
+      if(expr2->type !=AST_list) {
+        yyerror("Function Call args are not of type list");
+        exit(1);
+      }
+      function->args = expr2->obj.l;
+      node->type = AST_funct;
+      node->obj.f = function;
       break;
 
     default:
@@ -114,7 +141,7 @@ ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2,
   return node;
 }
 
-ast_node* new_ast_unop(ast_node* expr, int op, int dir) {
+ast_node* new_ast_single(ast_node* expr, int op, int dir) {
   ast_node* node = new_ast_node;
   node->type = AST_unop;
   struct unop* obj = calloc(1, sizeof(struct unop));
