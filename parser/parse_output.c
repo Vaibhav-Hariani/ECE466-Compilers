@@ -155,7 +155,7 @@ void print_recurse(ast_node* expr, int num_tabs, char** tokens) {
       char* pre_post = (u->sequence == PREFIX) ? "PREFIX" : "POSTFIX";
       opcode = u->opcode;
 
-      opcode_print(opcode, tokens, "BINARY OP ", pre_post);
+      opcode_print(opcode, tokens, "UNARY OP ", pre_post);
 
       print_recurse(u->expr, num_tabs + 1, tokens);
 
@@ -206,6 +206,7 @@ void print_recurse(ast_node* expr, int num_tabs, char** tokens) {
       for(int i = 0; i < str.size; i++){
         putc(str.li[i], stderr);
       }
+      putc('\n', stderr);
       break;
 
     case AST_charlit:;
