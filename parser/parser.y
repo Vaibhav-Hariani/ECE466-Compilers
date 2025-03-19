@@ -121,16 +121,16 @@ ternop_expr: binop_expr { $$=$1;}
 
 assign_expr: ternop_expr {$$=$1;}
 |   unop_expr '=' assign_expr      { $$=new_ast_double(AST_assign, $1, $3, '=');}
-|	expr TIMESEQ assign_expr	 { $$=new_ast_double(AST_assign, $1, $3, TIMESEQ);}
-|	expr DIVEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, DIVEQ);}
-|	expr MODEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, MODEQ);}
-|	expr PLUSEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, PLUSEQ);}
-|	expr MINUSEQ assign_expr  { $$=new_ast_double(AST_assign, $1, $3, MINUSEQ);}
-|	expr SHLEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
-|	expr SHREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
-|	expr ANDEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, ANDEQ);}
-|	expr OREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, OREQ);}
-|	expr XOREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, XOREQ);}
+|	unop_expr TIMESEQ assign_expr	 { $$=new_ast_double(AST_assign, $1, $3, TIMESEQ);}
+|	unop_expr DIVEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, DIVEQ);}
+|	unop_expr MODEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, MODEQ);}
+|	unop_expr PLUSEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, PLUSEQ);}
+|	unop_expr MINUSEQ assign_expr  { $$=new_ast_double(AST_assign, $1, $3, MINUSEQ);}
+|	unop_expr SHLEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
+|	unop_expr SHREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
+|	unop_expr ANDEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, ANDEQ);}
+|	unop_expr OREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, OREQ);}
+|	unop_expr XOREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, XOREQ);}
 ;
 
 arg_list: %empty { $$ = new_ast_list(0);} 
