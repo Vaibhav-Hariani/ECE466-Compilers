@@ -89,9 +89,9 @@ char** token_labels() {
 // Helper function to print an int
 void print_num(TypedNumber num) {
   if (num.type <= TYPE_ULLI) {
-    fprintf(stderr, "NUMLIT: %lld \n", num.val.i);
+    fprintf(stderr, "NUMLIT INT: %lld \n", num.val.i);
   } else {
-    fprintf(stderr, "NUMLIT: %Lg \n", num.val.f);
+    fprintf(stderr, "NUMLIT FLOAT: %Lg \n", num.val.f);
   }
 };
 
