@@ -1,5 +1,5 @@
 %{
-     #include "symtab.tab.h"
+     #include "parser.tab.h"
      int yylex(void);
      extern FILE *yyin;
  %}
@@ -20,8 +20,11 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %left ','
 %right '=' PLUSEQ MINUSEQ DIVEQ TIMESEQ MODEQ SHLEQ SHREQ ANDEQ OREQ XOREQ
 %right '?' ':'	/* This is where yacc will put it */
-%left LOGAND LOGOR
-%left '&' '^' '|'
+%left LOGOR
+%left LOGAND
+%left '|'
+%left '^'
+%left '&' 
 %left  EQEQ NOTEQ
 %left GTEQ LTEQ '>' '<'
 %left SHL SHR
@@ -35,7 +38,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 	char c;
 	TypedNumber n;
     SizedString s;
-    ast_node_t *node;
+    ast_node *node;
 } 
 %code requires {
     #include "yylval.h"
@@ -46,12 +49,12 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 }
 
 
-%nterm <node> expr terminal ast_binop ast_ternop ast_unop ast_assign ast_lvalue 
+%nterm <node> prog term_expr expr binop_expr ternop_expr unop_expr assign_expr arg_list 
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
 %token <s> STRING;
-%start terminal
+%start prog
 %%
 // 2 types of elements
 // expr, and lvalues
@@ -59,86 +62,140 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 // as such, they can be ternarys, pointers, or identifiers. Nothing else.
 //unops take in an lvalue, and do one of 3 operations to them.
 
-terminal: %empty {$$=0;}
-| terminal expr ';'  {$$ = print_ast($2);}
+prog: %empty {$$=0;}
+| prog term_expr ';'  {$$ = print_ast($2);}
 ;
 
+term_expr: assign_expr {$$=$1;}
+|   term_expr ',' assign_expr {$$ = new_ast_double(AST_binop, $1, $3, ',');} 
 
 expr: NUM {$$ = new_ast_num($1);}
+|   IDENT {$$ = new_ast_ident($1);}
 |   CHARLIT {$$ = new_ast_charlit($1);}
 |   STRING {$$ = new_ast_string($1);}
-|   ast_binop {$$ = $1;}
-|   ast_unop {$$ = $1;}
-|   ast_assign {$$=$1;}
-|   ast_lvalue {$$=$1;}
-|   '(' expr ')'            {$$=$2;}
-
+|   '(' term_expr ')'            {$$=$2;}
 ;
 
-ast_binop: expr '+' expr   { $$=new_ast_binop(AST_binop, $1, $3, '+');}
-|    expr '-' expr   { $$=new_ast_binop(AST_binop, $1, $3, '-');}
-|    expr '*' expr   { $$=new_ast_binop(AST_binop, $1, $3, '*');}
-|    expr '/' expr   { $$=new_ast_binop(AST_binop, $1, $3, '/');}
-|    expr '%' expr   { $$=new_ast_binop(AST_binop, $1, $3, '%');}
-|    expr '>' expr   { $$=new_ast_binop(AST_binop, $1, $3, '>');}
-|    expr '<' expr   { $$=new_ast_binop(AST_binop, $1, $3, '<');}
-|	 expr '&' expr 	 { $$=new_ast_binop(AST_binop, $1, $3, '&');}
-|	 expr '|' expr 	 { $$=new_ast_binop(AST_binop, $1, $3, '|');}
-|    expr '^' expr   { $$=new_ast_binop(AST_binop, $1, $3, '^');}
-|   expr SHL expr 	 { $$=new_ast_binop(AST_binop, $1, $3, SHL);}
-|	expr SHR expr 	 { $$=new_ast_binop(AST_binop, $1, $3, SHR);}
-|	expr EQEQ expr 	     { $$=new_ast_binop(AST_binop, $1, $3, EQEQ);}
-|	expr NOTEQ expr 	 { $$=new_ast_binop(AST_binop, $1, $3, NOTEQ);}
-|	expr LOGAND expr 	 { $$=new_ast_binop(AST_binop, $1, $3, LOGAND);}
-|	expr LOGOR expr 	 { $$=new_ast_binop(AST_binop, $1, $3, LOGOR);}
-|   expr LTEQ expr 	 { $$=new_ast_binop(AST_binop, $1, $3, LTEQ);}
-|	expr GTEQ expr 	 { $$=new_ast_binop(AST_binop, $1, $3, GTEQ);}
-
-|   expr ',' expr    { $$=new_ast_binop(AST_binop, $1, $3, ',');}
-//Special object type for objects with (potentially) 2 arguments, but aren't actually binops
-|   expr '(' expr ')' { $$=new_ast_binop(AST_special, $1, $3, ')');};
-|   expr '(' ')'    { $$=new_ast_binop(AST_special, $1, 0, ')');};
+unop_expr: expr {$$=$1;}
+|   unop_expr "++" %prec POSTFIX { $$ = new_ast_single($1, PLUSPLUS, POSTFIX);}
+|   unop_expr "--" %prec POSTFIX { $$ = new_ast_single($1, MINUSMINUS, POSTFIX);}
+|   "++" unop_expr %prec PREFIX  { $$ = new_ast_single($2, PLUSPLUS, PREFIX);}
+|   "--" unop_expr %prec PREFIX  { $$ = new_ast_single($2, MINUSMINUS, PREFIX);}
+|   unop_expr INDSEL IDENT       { $$=new_ast_double(AST_binop, $1, new_ast_ident($3), INDSEL);}
+|   unop_expr '.' IDENT          { $$ = new_ast_double(AST_binop, $1, new_ast_ident($3), '.');}
+//Helper function that should expand this into what it actually is
+|   unop_expr '['term_expr']'    { $$= ast_array_exp($1,$3);}
+|   unop_expr '(' arg_list ')'   { $$=new_ast_double(AST_funct, $1, $3, ')');}
+|   '+' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '+', PREFIX);}
+|   '-' unop_expr %prec SIZEOF   { $$= new_ast_single($2, '-', PREFIX);}
+|   '!' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '!', PREFIX);}
+|   '~' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '~', PREFIX);}
+|   '&' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '&', PREFIX);}
+|    '*' unop_expr %prec SIZEOF  { $$ = new_ast_single($2, '*', PREFIX);}
+|   SIZEOF unop_expr {$$ = new_ast_single($2, SIZEOF, PREFIX);}
 ;
 
 
-//separated here so theat lvalues can be handled properly later on in the system
-ast_assign: expr '=' expr   { $$=new_ast_binop(AST_assign, $1, $3, '=');}
-|	expr TIMESEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, TIMESEQ);}
-|	expr DIVEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, DIVEQ);}
-|	expr MODEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, MODEQ);}
-|	expr PLUSEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, PLUSEQ);}
-|	expr MINUSEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, MINUSEQ);}
-|	expr SHLEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, SHLEQ);}
-|	expr SHREQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, SHLEQ);}
-|	expr ANDEQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, ANDEQ);}
-|	expr OREQ expr 	     { $$=new_ast_binop(AST_assign, $1, $3, OREQ);}
-|	expr XOREQ expr 	 { $$=new_ast_binop(AST_assign, $1, $3, XOREQ);}
+binop_expr: unop_expr {$$=$1;}
+|   binop_expr '+' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '+');}
+|   binop_expr '-' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '-');}
+|   binop_expr '*' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '*');}
+|   binop_expr '/' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '/');}
+|   binop_expr '%' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '%');}
+|   binop_expr '>' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '>');}
+|   binop_expr '<' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '<');}
+|	binop_expr '&' binop_expr 	     { $$=new_ast_double(AST_binop, $1, $3, '&');}
+|	binop_expr '|' binop_expr 	     { $$=new_ast_double(AST_binop, $1, $3, '|');}
+|   binop_expr '^' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '^');}
+|   binop_expr SHL binop_expr 	     { $$=new_ast_double(AST_binop, $1, $3, SHL);}
+|	binop_expr SHR binop_expr  	     { $$=new_ast_double(AST_binop, $1, $3, SHR);}
+|	binop_expr EQEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, EQEQ);}
+|	binop_expr NOTEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, NOTEQ);}
+|	binop_expr LOGAND binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, LOGAND);}
+|	binop_expr LOGOR binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, LOGOR);}
+|   binop_expr LTEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, LTEQ);}
+|	binop_expr GTEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, GTEQ);}
+
+ternop_expr: binop_expr { $$=$1;}
+| binop_expr '?' binop_expr ':' binop_expr { $$=new_ast_ternop(AST_ternop, $1, $3, $5);};
+
+assign_expr: ternop_expr {$$=$1;}
+|   unop_expr '=' assign_expr      { $$=new_ast_double(AST_assign, $1, $3, '=');}
+|	unop_expr TIMESEQ assign_expr	 { $$=new_ast_double(AST_assign, $1, $3, TIMESEQ);}
+|	unop_expr DIVEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, DIVEQ);}
+|	unop_expr MODEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, MODEQ);}
+|	unop_expr PLUSEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, PLUSEQ);}
+|	unop_expr MINUSEQ assign_expr  { $$=new_ast_double(AST_assign, $1, $3, MINUSEQ);}
+|	unop_expr SHLEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
+|	unop_expr SHREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
+|	unop_expr ANDEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, ANDEQ);}
+|	unop_expr OREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, OREQ);}
+|	unop_expr XOREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, XOREQ);}
+;
+
+arg_list: %empty { $$ = new_ast_list(0);} 
+|   assign_expr { $$=new_ast_list($1);}
+|   arg_list ',' assign_expr %prec POSTFIX { $$ = append_ast_list($1, $3);}
+;
+
+declaration: decl_spec init_list ';'
+
+init_list: %empty
+|   init_decl
+|   init_list ',' init_decl   
+;
+
+// The second line is optional
+init_decl: declarator
+|   declarator = init
 ;
 
 
-ast_ternop: expr '?' expr ':' expr {$$=new_ast_ternop(AST_ternop, $1, $3, $5);};
+decl_spec: %empty
+| storage_class decl_spec
+| type_spec decl_spec
+| type_qual decl_spec
+| function_spec decl_spec
 
-ast_unop: expr "++" %prec POSTFIX {$$ = new_ast_unop($1, PLUSPLUS, POSTFIX);}
-|   expr "--" %prec POSTFIX {$$ = new_ast_unop($1, MINUSMINUS, POSTFIX);}
-|   "++" expr %prec PREFIX {$$ = new_ast_unop($2, PLUSPLUS, PREFIX);}
-|   "--" expr %prec PREFIX {$$ = new_ast_unop($2, MINUSMINUS, PREFIX);}
-|   '+' expr %prec SIZEOF  {$$ = new_ast_unop($2, '+', PREFIX);}
-|   '-' expr %prec PREFIX {$$= new_ast_unop($2, '-', PREFIX);}
-|   '!' expr %prec SIZEOF  {$$ = new_ast_unop($2, '!', PREFIX);}
-|   '~' expr %prec SIZEOF  {$$ = new_ast_unop($2, '~', PREFIX);}
-|   '&' expr %prec SIZEOF  {$$ = new_ast_unop($2, '&', PREFIX);}
-|   SIZEOF expr {$$ = new_ast_unop($2, SIZEOF, PREFIX);}
+storage_class: EXTERN
+|   STATIC
+|   TYPEDEF
+|   STATIC
+|   AUTO
+|   REGISTER
 ;
-//A hacky way of handling lvalues. They're nodes of other types, but just specified differently 
-ast_lvalue: IDENT {$$ = new_ast_lvalue(new_ast_ident($1));}
-|    '*' expr %prec SIZEOF {$$ = new_ast_lvalue(new_ast_unop($2, '*', PREFIX));}
-|    expr INDSEL IDENT {$$ = new_ast_lvalue(new_ast_binop(AST_special, $1, new_ast_ident($3), INDSEL));}
-|   expr '[' expr ']'  {$$ = new_ast_lvalue(new_ast_binop(AST_special, $1, $3, ']'));}
-//Special case of array creation, for empty arrays.
-|   expr '[' ']'    {$$ = new_ast_lvalue(new_ast_binop(AST_special, $1, 0, ']'));}
-|   expr '.' IDENT  {$$ = new_ast_lvalue(new_ast_binop(AST_special, $1, new_ast_ident($3), '.'));}
-| ast_ternop {$$ = new_ast_lvalue($1);}
+
+type_spec:   VOID
+|   CHAR
+|   SHORT
+|   INT
+|   LONG
+|   FLOAT
+|   DOUBLE
+|   SIGNED
+|   UNSIGNED
+|   BOOL
+|   COMPLEX
+|   struct_union_spec
+|   enum_spec //Optional 
+|   typedef_name //Also optional
 ;
+
+struct_union_spec: STRUCT '{' struct_decl_list '}'
+|   STRUCT IDENT '{' struct_decl_list '}'
+|   STRUCT IDENT
+|   UNION '{' struct_decl_list '}'
+|   UNION IDENT '{' struct_decl_list '}'
+|   UNION IDENT
+;
+struct_decl_list: struct_decl
+| struct_decl_list struct_decl
+;
+struct_decl:    spec_quali_list struct_decl
+
+
+function_spec: 
+
 
 /* keyword: STRUCT IDENT
 | CHAR
@@ -156,15 +213,8 @@ mult_keyword: LONG
 | mult_keyword mult_keyword
 
 ;
+ */
 
-storage_class: EXTERN
-|   STRUCT
-|   STATIC
-|   VOLATILE
-|   SIGNED
-|   UNSIGNED
-|   storage_class storage_class
-|    */
 %%
 
 /* #ifdef YYDEBUG
