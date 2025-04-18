@@ -4,234 +4,277 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "parser.tab.h"
+#include "symtab.tab.h"
 
-// Currently, string is the last token
-// Returns an array of pointers, that allows us to quickly find & fix tokens
-char** token_labels() {
-  char** tokens = calloc(STRING + 1, sizeof(tokens));
-  tokens[YYEOF] ="YYEOF";
-  tokens[YYerror] ="YYerror";
-  tokens[YYUNDEF] ="YYUNDEF";
-  tokens[TOKEOF] ="TOKEOF";
-  tokens[ELLIPSIS] ="...";
-  tokens[POUNDPOUND] ="##";
-  tokens[AUTO] ="AUTO";
-  tokens[BREAK] ="BREAK";
-  tokens[CASE] ="CASE";
-  tokens[CHAR] ="CHAR";
-  tokens[CONST] ="CONST";
-  tokens[CONTINUE] ="CONTINUE";
-  tokens[DEFAULT] ="DEFAULT";
-  tokens[DO] ="DO";
-  tokens[DOUBLE] ="DOUBLE";
-  tokens[ELSE] ="ELSE";
-  tokens[ENUM] ="ENUM";
-  tokens[EXTERN] ="EXTERN";
-  tokens[FLOAT] ="FLOAT";
-  tokens[FOR] ="FOR";
-  tokens[GOTO] ="GOTO";
-  tokens[IF] ="IF";
-  tokens[INLINE] ="INLINE";
-  tokens[INT] ="INT";
-  tokens[LONG] ="LONG";
-  tokens[REGISTER] ="REGISTER";
-  tokens[RESTRICT] ="RESTRICT";
-  tokens[RETURN] ="RETURN";
-  tokens[SHORT] ="SHORT";
-  tokens[SIGNED] ="SIGNED";
-  tokens[STATIC] ="STATIC";
-  tokens[STRUCT] ="STRUCT";
-  tokens[SWITCH] ="SWITCH";
-  tokens[TYPEDEF] ="TYPEDEF";
-  tokens[UNION] ="UNION";
-  tokens[UNSIGNED] ="UNSIGNED";
-  tokens[VOID] ="VOID";
-  tokens[VOLATILE] ="VOLATILE";
-  tokens[WHILE] ="WHILE";
-  tokens[BOOL] ="BOOL";
-  tokens[COMPLEX] ="COMPLEX";
-  tokens[IMAGINARY] ="IMAGINARY";
-  tokens[PLUSPLUS] ="++";
-  tokens[MINUSMINUS] ="--";
-  tokens[PLUSEQ] ="+=";
-  tokens[MINUSEQ] ="-=";
-  tokens[DIVEQ] ="/=";
-  tokens[TIMESEQ] ="*=";
-  tokens[MODEQ] ="%%=";
-  tokens[SHLEQ] ="<<=";
-  tokens[SHREQ] =">>=";
-  tokens[ANDEQ] ="&=";
-  tokens[OREQ] ="|=";
-  tokens[XOREQ] ="^=";
-  tokens[LOGAND] ="&&";
-  tokens[LOGOR] ="||";
-  tokens[EQEQ] ="==";
-  tokens[NOTEQ] ="!=";
-  tokens[GTEQ] =">=";
-  tokens[LTEQ] ="<=";
-  tokens[SHL] ="<<";
-  tokens[SHR] =">>";
-  tokens[SIZEOF] ="SIZEOF";
-  tokens[PREFIX] ="PREFIX";
-  tokens[POSTFIX] ="POSTFIX";
-  tokens[INDSEL] ="->";
-  tokens[IDENT] ="IDENT";
-  tokens[CHARLIT] ="CHARLIT";
-  tokens[NUM] ="NUM";
-  tokens[STRING] ="STRING";
-  return tokens;
+void print_indent(int num_tabs) {
+    char tab_arr[num_tabs + 1];
+    memset(tab_arr, '\t', num_tabs);
+    tab_arr[num_tabs] = '\0';
+    printf("%s", tab_arr);
 }
 
-ast_node_t* print_ast(ast_node_t* expr) {
-  char** tokens = token_labels();
-  print_recurse(expr, 0, tokens);
-  return expr;
+int print_qual(int qual) {
+    if (qual & QUAL_CONST) {
+        printf("const ");
+    } if (qual & QUAL_VOLATILE) {
+        printf("volatile ");
+    } if (qual & QUAL_RESTRICT) {
+        printf("restrict ");
+    } if (qual & QUAL_SIGNED) {
+        printf("signed ");
+    } else if (qual & QUAL_UNSIGNED) {
+        printf("unsigned ");
+    }
 }
 
-// Helper function to print an int
-void print_num(TypedNumber num) {
-  if (num.type <= TYPE_ULLI) {
-    fprintf(stderr, "NUMLIT: %lld \n", num.val.i);
-  } else {
-    fprintf(stderr, "NUMLIT: %Lg \n", num.val.f);
-  }
-};
-
-// Helper function to print the special objects
-void print_special(struct special* s, int num_tabs, char** tokens) {
-  num_tabs++;
-  char* str1;
-  char* str2;
-  char* str3;
-  char tab_arr[num_tabs + 1];
-  memset(tab_arr, '\t', num_tabs);
-  tab_arr[num_tabs] = '\0';
-
-  switch (s->opcode) {
-    case (']'):
-      str1 = "ARRAY INDEX:";
-      str2 = "OBJECT:";
-      str3 = "INDEX:";
-      break;
-    case (')'):
-      str1 = "FUNCTION CALL:";
-      str2 = "FUNCTION:";
-      str3 = "PARAMS:";
-      break;
-    case ('.'):
-      str1 = "MEMBER ACCESS";
-      str2 = "PARENT:";
-      str3 = "MEMBER:";
-      break;
-    case (INDSEL):
-      str1 = "MEMBER DEREFRENCE";
-      str2 = "PARENT:";
-      str3 = "MEMBER:";
-      break;
-  }
-  fprintf(stderr, "%s\n", str1);
-  fprintf(stderr, "%s %s\n", tab_arr, str2);
-  print_recurse(s->expr_1, num_tabs + 1, tokens);
-  if (s->expr_2 != NULL) {
-    fprintf(stderr, "%s %s\n", tab_arr, str3);
-    print_recurse(s->expr_2, num_tabs + 1, tokens);
-  }
+int print_scal(int scal_type) {
+    switch (scal_type) {
+        // we like to have a little bit of fun around here
+        case SCAL_LONGLONG:
+            printf("long "); 
+        case SCAL_LONG:
+            printf("long ");
+        case SCAL_INT:
+            printf("int\n");
+            break;
+        case SCAL_LONGDOUB:
+            printf("long ");
+        case SCAL_DOUB:
+            printf("double\n");
+            break;
+        case SCAL_FLOAT:
+            printf("float\n");
+            break;
+        case SCAL_VOID:
+            printf("void\n");
+            break;
+    }
+    return 0;
 }
 
-// As parser becomes larger and larger, this will need to be converted to a more
-// modular approach I'm thinking of using the enums as function pointers to
-// specific print functions. However, this bloated mess works for this
-// assignment that is currently much later than I (or you) would like
-void print_recurse(ast_node_t* expr, int num_tabs, char** tokens) {
-  char tab_arr[num_tabs + 1];
-  char* c;
+int print_scope(int scope_type, char *filename, int line) {
+    switch (scope_type) {
+        case SCOPE_FILE:
+            printf("global ");
+            break;
+        case SCOPE_FUNC:
+            printf("function ");
+            break;
+        case SCOPE_BLOCK:
+            printf("block ");
+            break;
+        case SCOPE_PROTO:
+            printf("prototype ");
+            break;
+        case SCOPE_STRU:
+            printf("struct ");
+            break;
+        case SCOPE_UNIO:
+            printf("union ");
+            break;
+        case SCOPE_ENU:
+            printf("enum ");
+            break;
+    }
+    printf("starting at <%s>:%d\n", filename, line);
+    return 0;
+}
 
-  memset(tab_arr, '\t', num_tabs);
-  tab_arr[num_tabs] = '\0';
-  fprintf(stderr, "%s", tab_arr);
+int print_stg(int stg_type) {
+    switch (stg_type) {
+        case STG_EXTERN_IMP:
+            printf("implicit extern\n");
+            break;
+        case STG_EXTERN_EXP:
+            printf("explicit extern\n");
+            break;
+        case STG_STATIC:
+            printf("static\n");
+            break;
+        case STG_REGISTER:
+            printf("register\n");
+            break;
+        case STG_AUTO_LOC:
+            printf("local auto\n");
+            break;
+        case STG_AUTO_PAR:
+            printf("parameter auto\n");
+            break;
+        case STG_NA:
+            printf("N/A\n");
+            break;
+    }
+    return 0;
+}
 
-  int opcode;
-  switch (expr->type) {
-    case AST_binop:
-      struct binop* b = expr->obj.b;
-      opcode = b->opcode;
+int print_params(ast_tab_t *tab, int num_tabs) {
+    ast_sym_t *curr;
 
-      if (opcode <= 255) {
-        fprintf(stderr, "BINARY OP %c \n", opcode);
-      } else {
-        fprintf(stderr, "BINARY OP %s \n", tokens[opcode]);
-      }
-      print_recurse(b->expr_1, num_tabs + 1, tokens);
-      print_recurse(b->expr_2, num_tabs + 1, tokens);
-      /* code */
-      break;
+    curr = tab->misc;
+    while (curr != NULL) {
+        print_ident(num_tabs);
+        printf("parameter %s {\n", curr->name);
+        print_indent(num_tabs + 1);
+        printf("stg class: \t");
+        print_stg(curr->stg_type);
+        print_indent(num_tabs + 1);
+        printf("data type:\n");
+        print_data(curr->data, num_tabs+2);
+        print_indent(num_tabs);
+        printf("}\n");
+    }
+    return 0;
+}
 
-    case AST_ternop:
-      struct ternop* t = expr->obj.t;
-      fprintf(stderr, "TERNARY: \n");
-      fprintf(stderr, "%s EXPR 1: \n", tab_arr);
-      print_recurse(t->expr_1, num_tabs + 1, tokens);
-      fprintf(stderr, "%s EXPR 2: \n", tab_arr);
-      print_recurse(t->expr_2, num_tabs + 1, tokens);
-      fprintf(stderr, "%s EXPR 3: \n", tab_arr);
-      print_recurse(t->expr_3, num_tabs + 1, tokens);
-      break;
+int print_data(ast_data_t *data, int num_tabs) {
+    print_indent(num_tabs);
+    print_qual(data->qual);
+    switch (data->data_type) {
+        case DATA_SCAL:
+            print_scal(data->node->scal->scal_type);
+            break;
+        case DATA_PTR:
+            printf("pointer to\n");
+            print_data(data->node->ptr->to, num_tabs + 1);
+            break;
+        case DATA_ARY:
+            if (data->node->ary->size > 0) {
+                printf("ary of %d elements of type\n", data->node->ary->size);
+            } else {
+                printf("ary of elements of type\n");
+            }
+            print_data(data->node->ary->elem, num_tabs + 1);
+            break;
+        case DATA_FUNC:
+            if (!data->node->func->is_complete) {
+                printf("incomplete ");
+            }
+            if (data->node->func->is_inline) {
+                printf("inline ");
+            }
+            printf("function with return type\n");
+            print_data(data->node->func->ret, num_tabs + 1);
+            print_indent(num_tabs);
+            printf("which takes the arguments:");
+            print_params(data->node->func->params, num_tabs + 1);
+            break;
+        case DATA_PARAM:
+            printf("parameter of type\n");
+            print_data(data->node->param->is, num_tabs = 1);
+            break;
+        case DATA_STRU:
+            if (data->node->stru->sym->name != NULL) {
+                printf("struct %s ", data->node->stru->sym->name);
+            } else {
+                printf("anonymous struct ");
+            }
+            if (data->node->stru->is_complete) {
+                printf("(defined at <%s>:%d)\n",
+                    data->node->stru->sym->filename,
+                    data->node->stru->sym->line);
+            } else {
+                printf("(incomplete)\n");
+            }
+            break;
+        case DATA_UNIO:
+            if (data->node->unio->sym->name != NULL) {
+                printf("union %s ", data->node->unio->sym->name);
+            } else {
+                printf("anonymous union ");
+            }
+            if (data->node->unio->is_complete) {
+                printf("(defined at <%s>:%d)\n",
+                    data->node->unio->sym->filename,
+                    data->node->unio->sym->line);
+            } else {
+                printf("(incomplete)\n");
+            }
+            break;
+        case DATA_ENU:
+            if (data->node->enu->sym->name != NULL) {
+                printf("enum %s ", data->node->enu->sym->name);
+            } else {
+                printf("anonymous enum ");
+            }
+            printf("(defined at <%s>:%d)\n",
+                    data->node->unio->sym->filename,
+                    data->node->unio->sym->line);
+            break;
+        case DATA_LABEL:
+            printf("label");
+            break;
+    }
+    return 0;
+}
 
-    case AST_unop:
-      struct unop* u = expr->obj.u;
-      char* pre_post = (u->sequence == PREFIX) ? "PREFIX" : "POSTFIX";
-      opcode = u->opcode;
-      if (opcode <= 255) {
-        fprintf(stderr, "UNARY OP %c %s \n", opcode, pre_post);
-      } else {
-        fprintf(stderr, "UNARY OP %s %s \n", tokens[u->opcode], pre_post);
-      }
-      print_recurse(u->expr, num_tabs + 1, tokens);
-      break;
+int print_memb_decl(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_name) {
+    print_indent(num_tabs);
+    printf("%s %s field %s defined at <%s>:%d {\n",
+        data_name, sym->name, memb->name, memb->filename, memb->line);
+    print_indent(num_tabs + 1);
+    printf("scope: ");
+    print_scope(memb->tab->scope_type, memb->tab->filename, memb->tab->line);
+    print_indent(num_tabs + 1);
+    printf("data type:\n");
+    print_data(memb->data, num_tabs + 2);
+    print_indent(num_tabs);
+    printf("}\n");
+    return 0;
+}
 
-    case AST_assign:
-      struct assign* a = expr->obj.a;
-      opcode = a->opcode;
-      if (opcode < 255) {
-        fprintf(stderr, "ASSIGNMENT \' %c \', \n", opcode);
-      } else {
-        fprintf(stderr, "ASSIGNMENT \' %s \', \n", tokens[opcode]);
-      }
-      fprintf(stderr, "%s LVAL: \n", tab_arr);
-      print_recurse(a->lvalue, num_tabs + 1, tokens);
-      fprintf(stderr, "%s RVAL: \n", tab_arr);
-      print_recurse(a->rvalue, num_tabs + 1, tokens);
-      break;
+int print_sym_decl(ast_sym_t *sym, int num_tabs) {
+    print_indent(num_tabs);
+    printf("%s %s defined at <%s>:%d {\n",
+        (sym->sym_type == SYM_VAR)? "variable" : "function",
+        sym->name, sym->filename, sym->line);
+    print_indent(num_tabs + 1);
+    printf("scope:     \t");
+    print_scope(sym->tab->scope_type, sym->tab->filename, sym->tab->line);
+    print_indent(num_tabs + 1);
+    printf("stg class: \t");
+    print_stg(sym->stg_type);
+    print_indent(num_tabs + 1);
+    printf("data type:\n");
+    print_data(sym->data, num_tabs+2);
+    print_indent(num_tabs);
+    printf("}\n\n");
+    return 0;
+}
 
-    case AST_ident:
-      c = expr->obj.ident;
-      fprintf(stderr, "IDENT: %s \n", c);
-      break;
+int print_obj_def(ast_sym_t *sym, int num_tabs) {
+    char *data_name;
+    ast_sym_t *memb;
 
-    case AST_string:
-      c = expr->obj.str.li;
-      fprintf(stderr, "STRINGLIT: %s \n", c);
-      break;
+    memb = NULL;
+    data_name = NULL;
+    switch (sym->sym_type) {
+        case SYM_STRU_T:
+            strdup(data_name, "struct");
+            memb = sym->data->node->stru->minitab->memb;
+            break;
+        case SYM_UNIO_T:
+            strdup(data_name, "union");
+            memb = sym->data->node->unio->minitab->memb;
+            break;
+        case SYM_ENU_T:
+            strdup(data_name, "enum");
+            memb = sym->data->node->enu->minitab->memb;
+            break;
+    }
+    
+    print_indent(num_tabs);
+    printf("%s %s defined at <%s>:%d {\n",
+        data_name, sym->name, sym->filename, sym->line);
+    print_indent(num_tabs + 1);
+    printf("scope: ");
+    print_scope(sym->tab->scope_type, sym->tab->filename, sym->tab->line);
+    
+    while (memb != NULL) {
+        print_memb_decl(memb, num_tabs + 1, data_name, sym->name);
+        memb = memb->next;
+    }
+    print_indent(num_tabs);
+    printf("}\n\n");
 
-    case AST_charlit:
-      char lit = expr->obj.charlit;
-      fprintf(stderr, "CHARLIT: %c: \n", lit);
-      break;
-
-    case AST_num:
-      TypedNumber n = expr->obj.num;
-      print_num(n);
-      break;
-
-    case AST_special:
-      struct special* s = expr->obj.s;
-      print_special(s, num_tabs, tokens);
-      break;
-
-    default:
-      fprintf(stderr, "Unkown Expression Type: Failed \n");
-      exit(1);
-      break;
-  }
+    return 0;
 }

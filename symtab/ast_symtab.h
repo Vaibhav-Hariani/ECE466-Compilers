@@ -7,10 +7,12 @@ enum scope_type {
     SCOPE_FILE = 0,
     SCOPE_FUNC,
     SCOPE_BLOCK,
-    SCOPE_PROTO
+    SCOPE_PROTO,
+    SCOPE_STRU,
+    SCOPE_UNIO,
+    SCOPE_ENU
 };
 
-// namespace divisions commented here
 enum sym_type {
     /*misc*/
     SYM_VAR = 0,
@@ -36,17 +38,26 @@ enum ns_type {
     NS_LABEL
 };
 
-enum type_type {
-    TYPE_SCAL = 0,
-    TYPE_VAR,
-    TYPE_PTR,
-    TYPE_ARY,
-    TYPE_FUNC,
-    TYPE_PARAM,
-    TYPE_STRU,
-    TYPE_UNIO,
-    TYPE_ENU,
-    TYPE_LABEL
+enum data_type {
+    DATA_SCAL = 0,
+    DATA_PTR,
+    DATA_ARY,
+    DATA_FUNC,
+    DATA_PARAM,
+    DATA_STRU,
+    DATA_UNIO,
+    DATA_ENU,
+    DATA_LABEL
+};
+
+enum scal_type {
+    SCAL_INT=0,
+    SCAL_LONG,
+    SCAL_LONGLONG,
+    SCAL_FLOAT,
+    SCAL_DOUB,
+    SCAL_LONGDOUB,
+    SCAL_VOID
 };
 
 enum stg_type {
@@ -61,25 +72,25 @@ enum stg_type {
 
 // get/set with bitwise operations
 // don't ask me why i did it this way
-enum qualifiers {
-    QUAL_UNSIGNED = 1,  // 0001
-    QUAL_CONST = 2,     // 0010
-    QUAL_VOLATILE = 4,  // 0100
-    QUAL_RESTRICT = 8   // 1000
+enum qual_type {
+    QUAL_SIGNED = 1,    // 00001
+    QUAL_UNSIGNED = 2,  // 00010
+    QUAL_CONST = 4,     // 00100
+    QUAL_VOLATILE = 8,  // 01000
+    QUAL_RESTRICT = 16  // 10000
 };
 
 
 typedef struct ast_tab ast_tab_t;
 typedef struct ast_sym ast_sym_t;
-typedef struct ast_type ast_type_t;
+typedef struct ast_data ast_data_t;
 
-// Contains an ast for some type.
-struct ast_type {
-    char type;
+// Contains an ast for some data type.
+struct ast_data {
+    char data_type;
     char qual;
     union {
         struct ast_scal *scal;
-        struct ast_var *var;
         struct ast_ptr *ptr;
         struct ast_ary *ary;
         struct ast_func *func;
@@ -99,6 +110,8 @@ struct ast_type {
 struct ast_tab {
     ast_tab_t *parent;
     char scope_type;
+    char *filename;
+    int line;
 
     ast_sym_t *misc;
     ast_sym_t *tag;
@@ -113,7 +126,7 @@ struct ast_tab {
 // namespace, the file name and line
 // number at which the symbol was defined
 // and the type info.
-typedef struct ast_sym {
+struct ast_sym {
     ast_tab_t *tab;
     ast_sym_t *next;
     char *filename;
@@ -123,50 +136,55 @@ typedef struct ast_sym {
     char stg_type;
     char sym_type;
     int offset;
-    ast_type_t *type;
-} ast_sym_t;
+    ast_data_t *data;
+};
 
 struct ast_scal {
     char scal_type;
 };
 
 struct ast_var {
-    ast_type_t *is;
+    ast_data_t *is;
 };
 
 struct ast_ptr {
-    ast_type_t *to;
+    ast_data_t *to;
 };
 
 struct ast_ary {
     int size;
-    ast_type_t *elem;
+    ast_data_t *elem;
 };
 
 // note: special qualifier rules
 struct ast_param {
-    ast_type_t *is;
+    ast_data_t *is;
 };
 
 // note: scope is always file/global per gcc
 // but not necessarily so per standard.
 struct ast_func {
-    ast_type_t *ret;
+    int is_complete;
+    int is_inline;
+    ast_data_t *ret;
     ast_tab_t *params;
 };
 
 struct ast_stru {
     char is_complete;
+    ast_sym_t *sym;
     ast_tab_t *minitab;
 };
 
 struct ast_unio {
     char is_complete;
+    ast_sym_t *sym;
     ast_tab_t *minitab;
 };
 
 // enums may not get implemented
 struct ast_enu {
+    ast_sym_t *sym;
     ast_tab_t *minitab;
 };
 
@@ -176,28 +194,29 @@ struct ast_label {
 };
 
 struct ast_scal *new_ast_scal(char scal_type);
-struct ast_var *new_ast_var(ast_type_t *is);
-struct ast_ptr *new_ast_ptr(ast_type_t *to);
-struct ast_ary *new_ast_ary(int size, ast_type_t *elem);
-struct ast_param *new_ast_param(ast_type_t *is);
-struct ast_func *new_ast_func(ast_type_t *ret, ast_tab_t *params);
+struct ast_var *new_ast_var(ast_data_t *is);
+struct ast_ptr *new_ast_ptr(ast_data_t *to);
+struct ast_ary *new_ast_ary(int size, ast_data_t *elem);
+struct ast_param *new_ast_param(ast_data_t *is);
+struct ast_func *new_ast_func(int is_complete, int is_inline,
+    ast_data_t *ret, ast_tab_t *params);
 struct ast_stru *new_ast_stru(char is_complete, ast_tab_t *minitab);
 struct ast_unio *new_ast_unio(char is_complete, ast_tab_t *minitab);
 struct ast_enu *new_ast_enu(ast_tab_t *minitab);
 struct ast_label *new_ast_label(int is_complete);
 
-// Creates ast_type_t object with specified type, qualifiers
+// Creates ast_data_t object with specified type, qualifiers
 // and type node and returns its address.
-ast_type_t *new_ast_type(char type, char qual, void *node);
+ast_data_t *new_ast_data(char data_type, char qual, void *node);
 
-// Frees type pointed to by type, also freeing nested types.
-int del_ast_type(ast_type_t *type);
+// Recursively frees data type pointed to by data.
+int del_ast_data(ast_data_t *data);
 
 // Creates ast_sym_t object with the specified name, storage
-// class and type and returns its address. Assumes name,
-// type and filename are dynamically allocated and uses
+// class and data type and returns its address. Assumes name,
+// data type and filename are dynamically allocated and uses
 // their same addresses.
-ast_sym_t *new_ast_sym(char *name, char stg_type, ast_type_t *type,
+ast_sym_t *new_ast_sym(char *name, char stg_type, ast_data_t *data,
     char *filename, int line);
 
 // Destroys symbol table entry pointed to by sym and all
@@ -207,8 +226,10 @@ ast_sym_t *del_ast_sym(ast_sym_t *sym);
 
 // Creates a new symbol table with scope type scope_type
 // whose enclosing scope has the symbol table pointed to
-// by parent.
-ast_tab_t *new_ast_tab(ast_tab_t *parent, char scope_type);
+// by parent. Assumes parent and filename are dynamically
+// allocated and uses their addresses.
+ast_tab_t *new_ast_tab(ast_tab_t *parent, char scope_type,
+    char *filename, int line);
 
 // Destroys symbol table pointed to by tab and all storage
 // it consumes. Returns a pointer to the symbol table for

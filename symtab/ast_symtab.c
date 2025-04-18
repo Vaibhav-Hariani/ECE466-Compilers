@@ -13,7 +13,7 @@ struct ast_scal *new_ast_scal(char scal_type){
     return scal;
 }
 
-struct ast_var *new_ast_var(ast_type_t *is){
+struct ast_var *new_ast_var(ast_data_t *is){
     struct ast_var *var;
 
     var = calloc(1, sizeof(struct ast_var));
@@ -21,7 +21,7 @@ struct ast_var *new_ast_var(ast_type_t *is){
     return var;
 }
 
-struct ast_ptr *new_ast_ptr(ast_type_t *to){
+struct ast_ptr *new_ast_ptr(ast_data_t *to){
     struct ast_ptr *ptr;
 
     ptr = calloc(1, sizeof(struct ast_ptr));
@@ -29,7 +29,7 @@ struct ast_ptr *new_ast_ptr(ast_type_t *to){
     return ptr;
 }
 
-struct ast_ary *new_ast_ary(int size, ast_type_t *elem){
+struct ast_ary *new_ast_ary(int size, ast_data_t *elem){
     struct ast_ary *ary;
 
     ary = calloc(1, sizeof(struct ast_ary));
@@ -38,16 +38,19 @@ struct ast_ary *new_ast_ary(int size, ast_type_t *elem){
     return ary;
 }
 
-struct ast_func *new_ast_func(ast_type_t *ret, ast_tab_t *params){
+struct ast_func *new_ast_func(int is_complete, int is_inline,
+        ast_data_t *ret, ast_tab_t *params){
     struct ast_func *func;
 
     func = calloc(1, sizeof(struct ast_func));
+    func->is_complete = is_complete;
+    func->is_inline = is_inline;
     func->ret = ret;
     func->params = params;
     return func;
 }
 
-struct ast_param *new_ast_param(ast_type_t *is){
+struct ast_param *new_ast_param(ast_data_t *is){
     struct ast_param *param;
 
     param = calloc(1, sizeof(struct ast_param));
@@ -81,92 +84,87 @@ struct ast_enu *new_ast_enu(ast_tab_t *minitab){
     return enu;
 }
 
-ast_type_t *new_ast_type(char type, char qual, void *node){
-    ast_type_t *symtype;
+ast_data_t *new_ast_data(char data_type, char qual, void *node){
+    ast_data_t *data;
 
-    symtype = calloc(1, sizeof(ast_type_t));
-    symtype->type = type;
-    symtype->qual = qual;
+    data = calloc(1, sizeof(ast_data_t));
+    data->data_type = data_type;
+    data->qual = qual;
     
-    switch (type) {
-        case TYPE_SCAL:
-            symtype->node->scal = (struct ast_scal *) node;
+    switch (data_type) {
+        case DATA_SCAL:
+            data->node->scal = (struct ast_scal *) node;
             break;
-        case TYPE_VAR:
-            symtype->node->var = (struct ast_var *) node;
+        case DATA_PTR:
+            data->node->ptr = (struct ast_ptr *) node;
             break;
-        case TYPE_PTR:
-            symtype->node->ptr = (struct ast_ptr *) node;
+        case DATA_ARY:
+            data->node->ary = (struct ast_ary *) node;
             break;
-        case TYPE_ARY:
-            symtype->node->ary = (struct ast_ary *) node;
+        case DATA_FUNC:
+            data->node->func = (struct ast_func *) node;
             break;
-        case TYPE_FUNC:
-            symtype->node->func = (struct ast_func *) node;
+        case DATA_PARAM:
+            data->node->param = (struct ast_param *) node;
             break;
-        case TYPE_PARAM:
-            symtype->node->param = (struct ast_param *) node;
+        case DATA_STRU:
+            data->node->stru = (struct ast_stru *) node;
             break;
-        case TYPE_STRU:
-            symtype->node->stru = (struct ast_stru *) node;
+        case DATA_UNIO:
+            data->node->unio = (struct ast_unio *) node;
             break;
-        case TYPE_UNIO:
-            symtype->node->unio = (struct ast_unio *) node;
+        case DATA_ENU:
+            data->node->enu = (struct ast_enu *) node;
             break;
-        case TYPE_ENU:
-            symtype->node->enu = (struct ast_enu *) node;
-            break;
-        case TYPE_LABEL:
-            symtype->node->label = (struct ast_label *) node;
+        case DATA_LABEL:
+            data->node->label = (struct ast_label *) node;
             break;
     }
 
-    return symtype;
+    return data;
 }
 
-int del_ast_type(ast_type_t *type) {
-    switch (type->type) {
-        case TYPE_VAR:
-            del_ast_type(type->node->var->is);
+int del_ast_data(ast_data_t *data) {
+    switch (data->data_type) {
+        case DATA_PTR:
+            del_ast_data(data->node->ptr->to);
             break;
-        case TYPE_PTR:
-            del_ast_type(type->node->ptr->to);
+        case DATA_ARY:
+            del_ast_data(data->node->ary->elem);
             break;
-        case TYPE_ARY:
-            del_ast_type(type->node->ary->elem);
+        case DATA_PARAM:
+            del_ast_data(data->node->param->is);
             break;
-        case TYPE_PARAM:
-            del_ast_type(type->node->param->is);
+        case DATA_FUNC:
+            del_ast_data(data->node->func->ret);
+            del_ast_tab(data->node->func->params);
             break;
-        case TYPE_FUNC:
-            del_ast_type(type->node->func->ret);
-            del_ast_tab(type->node->func->params);
+        case DATA_STRU:
+            del_ast_tab(data->node->stru->minitab);
             break;
-        case TYPE_STRU:
-            del_ast_tab(type->node->stru->minitab);
+        case DATA_UNIO:
+            del_ast_tab(data->node->unio->minitab);
             break;
-        case TYPE_UNIO:
-            del_ast_tab(type->node->unio->minitab);
+        case DATA_ENU:
+            del_ast_tab(data->node->enu->minitab);
             break;
-        case TYPE_ENU:
-            del_ast_tab(type->node->enu->minitab);
-            break;
-        // TYPE_SCAL, TYPE_LABEL fall through
+        // DATA_SCAL, DATA_LABEL fall through
         // typedef case not implemented
     }
 
-    free(type->node);
-    free(type);
+    free(data->node);
+    free(data);
     return 0;
 }
 
-ast_sym_t *new_ast_sym(char *name, char stg_type, ast_type_t *type,
+ast_sym_t *new_ast_sym(char *name, char stg_type, ast_data_t *data,
         char *filename, int line){
     ast_sym_t *sym;
 
     sym = calloc(1, sizeof(ast_sym_t));
     sym->name = name;
     sym->stg_type = stg_type;
+    sym->data = data;
     sym->filename = filename;
     sym->line = line;
     return sym;
@@ -179,18 +177,21 @@ ast_sym_t *del_ast_sym(ast_sym_t *sym) {
     free(sym->name);
     free(sym->filename);
     free(sym->tab);
-    del_ast_type(sym->type);
+    del_ast_data(sym->data);
     
     free(sym);
     return next;
 }
 
-ast_tab_t *new_ast_tab(ast_tab_t *parent, char scope_type) {
+ast_tab_t *new_ast_tab(ast_tab_t *parent, char scope_type,
+    char *filename, int line) {
     ast_tab_t *tab;
 
     tab = calloc(1, sizeof(ast_tab_t));
     tab->parent = parent;
     tab->scope_type = scope_type;
+    tab->filename = filename;
+    tab->line = line;
     return tab;
 }
 
@@ -224,6 +225,7 @@ ast_tab_t *del_ast_tab(ast_tab_t *tab) {
         tab->label = next;
     }
     
+    free(tab->filename);
     return encl;
 }
 
