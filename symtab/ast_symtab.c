@@ -74,12 +74,13 @@ union ast_type *new_ast_param(ast_data_t *is){
     return node;
 }
 
-union ast_type *new_ast_stru(char is_complete, ast_tab_t *minitab){
+union ast_type *new_ast_stru(char is_complete, ast_sym_t *tag, ast_tab_t *minitab){
     struct ast_stru *stru;
     union ast_type *node;
 
     stru = calloc(1, sizeof(struct ast_stru));
     stru->is_complete = is_complete;
+    stru->tag = tag;
     stru->minitab = minitab;
 
     node = calloc(1, sizeof (union ast_type));
@@ -87,12 +88,13 @@ union ast_type *new_ast_stru(char is_complete, ast_tab_t *minitab){
     return node;
 }
 
-union ast_type *new_ast_unio(char is_complete, ast_tab_t *minitab){
+union ast_type *new_ast_unio(char is_complete, ast_sym_t *tag, ast_tab_t *minitab){
     struct ast_unio *unio;
     union ast_type *node;
 
     unio = calloc(1, sizeof(struct ast_unio));
     unio->is_complete = is_complete;
+    unio->tag = tag;
     unio->minitab = minitab;
 
     node = calloc(1, sizeof (union ast_type));
@@ -100,12 +102,12 @@ union ast_type *new_ast_unio(char is_complete, ast_tab_t *minitab){
     return node;
 }
 
-union ast_type *new_ast_enu(ast_tab_t *minitab){
+union ast_type *new_ast_enu(ast_sym_t *tag){
     struct ast_enu *enu;
     union ast_type *node;
  
     enu = calloc(1, sizeof(struct ast_enu));
-    enu->minitab = minitab;
+    enu->tag = tag;
 
     node = calloc(1, sizeof (union ast_type));
     node->enu = enu;
@@ -186,10 +188,7 @@ int del_ast_data(ast_data_t *data) {
         case DATA_UNIO:
             del_ast_tab(data->node->unio->minitab);
             break;
-        case DATA_ENU:
-            del_ast_tab(data->node->enu->minitab);
-            break;
-        // DATA_SCAL, DATA_LABEL fall through
+        // DATA_SCAL, DATA_ENU, DATA_LABEL fall through
         // typedef case not implemented
     }
 
@@ -318,7 +317,7 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type) {
     return NULL;
 }
 
-int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
+ast_sym_t *enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
     ast_sym_t *old, *next;
     int namespace;
 
@@ -336,16 +335,17 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
             // we do this in old because there's already some symbol
             // in the table pointing to old as the next symbol.
 
-            // once all of that is done, we have redeclared old
+            // once all of that is done, assuming no error,
+            // we have redeclared old
             free(old->filename);
             old->filename = strdup(sym->filename);
             old->line = sym->line;
             del_ast_sym(sym);
-            sym = old;
-            return 1;
+            return old;
         } else {
             // ERROR symbol already defined, cant replace
-            return 2;
+            del_ast_sym(sym);
+            return NULL;
         }
     } else {
         namespace = NS_MISC;
@@ -378,5 +378,5 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
     }
 
     enter(tab, next, replace_dup);
-    return 0;
+    return sym;
 }

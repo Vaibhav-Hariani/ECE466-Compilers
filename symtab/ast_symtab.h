@@ -88,9 +88,9 @@ enum qual_type {
 };
 
 
-typedef struct ast_tab ast_tab_t;
-typedef struct ast_sym ast_sym_t;
 typedef struct ast_data ast_data_t;
+typedef struct ast_sym ast_sym_t;
+typedef struct ast_tab ast_tab_t;
 
 // Contains an ast for some data type.
 struct ast_data {
@@ -110,24 +110,6 @@ struct ast_data {
     } *node;
 };
 
-// Each symbol table contains a pointer
-// to the parent symbol table (i.e. the
-// symbol table of immediate enclosing
-// scope), the type of scope and the
-// first element of each namespace.
-struct ast_tab {
-    ast_tab_t *parent;
-    char scope_type;
-    char *filename;
-    int line;
-
-    ast_sym_t *misc;
-    ast_sym_t *tag;
-    ast_sym_t *memb;
-    ast_sym_t *label;
-};
-
-
 // Each symbol contains a pointer to the
 // table that contains the symbol, the
 // next element of the table in the same
@@ -146,6 +128,23 @@ struct ast_sym {
     char is_inline;
     int offset;
     ast_data_t *data;
+};
+
+// Each symbol table contains a pointer
+// to the parent symbol table (i.e. the
+// symbol table of immediate enclosing
+// scope), the type of scope and the
+// first element of each namespace.
+struct ast_tab {
+    ast_tab_t *parent;
+    char scope_type;
+    char *filename;
+    int line;
+
+    ast_sym_t *misc;
+    ast_sym_t *tag;
+    ast_sym_t *memb;
+    ast_sym_t *label;
 };
 
 struct ast_scal {
@@ -177,20 +176,19 @@ struct ast_func {
 
 struct ast_stru {
     char is_complete;
-    ast_sym_t *sym;
+    ast_sym_t *tag;
     ast_tab_t *minitab;
 };
 
 struct ast_unio {
     char is_complete;
-    ast_sym_t *sym;
+    ast_sym_t *tag;
     ast_tab_t *minitab;
 };
 
 // enums may not get implemented
 struct ast_enu {
-    ast_sym_t *sym;
-    ast_tab_t *minitab;
+    ast_sym_t *tag;
 };
 
 // note: scope is always function
@@ -203,9 +201,9 @@ union ast_type *new_ast_ptr(ast_data_t *to);
 union ast_type *new_ast_ary(TypedNumber size, ast_data_t *elem);
 union ast_type *new_ast_param(ast_data_t *is);
 union ast_type *new_ast_func(char is_complete, ast_data_t *ret, ast_tab_t *params);
-union ast_type *new_ast_stru(char is_complete, ast_tab_t *minitab);
-union ast_type *new_ast_unio(char is_complete, ast_tab_t *minitab);
-union ast_type *new_ast_enu(ast_tab_t *minitab);
+union ast_type *new_ast_stru(char is_complete, ast_sym_t *tag, ast_tab_t *minitab);
+union ast_type *new_ast_unio(char is_complete, ast_sym_t *tag, ast_tab_t *minitab);
+union ast_type *new_ast_enu(ast_sym_t *tag);
 union ast_type *new_ast_label(char is_complete);
 
 // Creates ast_data_t object with specified type, qualifiers
@@ -250,9 +248,10 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type);
 // the chain of next ast_sym_t *s into the table pointed to
 // by tab. If replace_dup is 0, an error occurs if a symbol
 // with the same name and namespace exists; otherwise, such a
-// symbol is replaced. Returns 0 on entry, 1 on replacement,
-// 2 on error. On replacement, sym will change to point to
-// the symbol in the tab.
-int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
+// symbol is replaced.
+// If replace_dup is 0, returns sym on success, NULL on fail.
+// If replace_dup is 1, returns either sym or the address
+// into which *sym was merged on success, NULL on fail. 
+ast_sym_t *enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
 
 #endif // AST_SYMTAB_H

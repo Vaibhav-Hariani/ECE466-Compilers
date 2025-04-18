@@ -75,21 +75,22 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %define api.location.type {YYLTYPE}
 %locations
 
-%nterm <c> stgclass_spec qual_spec
-%nterm <node> prog term_expr expr binop_expr ternop_expr unop_expr assign_expr
-%nterm <data> type_spec func_spec enum_type_spec float_type_spec int_type_spec struct_type_spec union_type_spec
-%nterm <sym> declaration_spec init_declarator_list 
-%nterm <tab>
-%nterm <scal>
-%nterm <var>
-%nterm <ptr>
-%nterm <ary>
-%nterm <param>
-%nterm <func>
-%nterm <stru>
-%nterm <unio>
-%nterm <enu>
-%nterm <label>
+%nterm <i> enum_constant_def ident_opt;
+%nterm <c> stgclass_spec qual_spec;
+%nterm <node> prog term_expr expr binop_expr ternop_expr unop_expr assign_expr;
+%nterm <data> type_spec func_spec enum_type_spec enum_type_def enum_type_ref float_type_spec int_type_spec struct_type_spec union_type_spec;
+%nterm <sym> declaration_spec init_declarator_list enum_def_list;
+%nterm <tab>;
+%nterm <scal>;
+%nterm <var>;
+%nterm <ptr>;
+%nterm <ary>;
+%nterm <param>;
+%nterm <func>;
+%nterm <stru>;
+%nterm <unio>;
+%nterm <enu>;
+%nterm <label>;
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
@@ -192,38 +193,59 @@ func_spec:
 ;
 
 type_spec:
-	enum_type_spec
-|	float_type_spec
-|	int_type_spec
-|	struct_type_spec
-|	union_type_spec
-|	VOID
-|	typedef_name
+	enum_type_spec	{$$ = $1;}
+|	float_type_spec	{$$ = $1;}
+|	int_type_spec	{$$ = $1;}
+|	struct_type_spec	{$$ = $1;}
+|	union_type_spec	{$$ = $1;}
+|	VOID	{$$ = new_ast_data(0, DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_VOID));}
+|	IDENT /*typedef not implemented*/
 ;
 
 enum_type_spec:
-	enum_type_def
-|	enum_type_ref
+	enum_type_def	{$$ = $1;}
+|	enum_type_ref	{$$ = $1;}
 ;
 
 enum_type_def:
-	ENUM '{' enum_def_list '}'
-|	ENUM '{' enum_def_list ',' '}'
-|	ENUM IDENT '{' enum_def_list '}'
-|	ENUM IDENT'{' enum_def_list ',' '}'
+	ENUM '{' enum_def_list comma_opt '}' {
+		$$ = new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE,
+			new_ast_enu(NULL));
+		$$->next = $3;
+	}
+|	ENUM IDENT '{' enum_def_list comma_opt '}' {
+		ast_sym_t *tag = new_ast_sym($2, STG_NONE, SYM_ENUM_T,
+				new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE, NULL));
+		tag->data->node->enu->tag = tag; /*this is ridiculous*/
+		$$ = tag->data;
+		$$->next = $4;
+	}
 ;
 
 enum_type_ref:
-	ENUM IDENT
+	ENUM IDENT	{
+		$$ = lookup(scope_tab, $2, SYM_ENUM_T);
+		if ($$ == NULL) {
+			/*no forward references allowed for enums, so:*/
+			/*ERROR*/
+		}
+	}
 ;
 
 enum_def_list:
-	enum_constant_def
-|	enum_def_list ',' enum_constant_def
+	enum_constant_def	{
+		$$ = new_ast_sym($1, STGCLASS_NA, SYM_ENUM_C, NULL,
+			@1.filename, @1.line);
+	}
+|	enum_def_list ',' enum_constant_def	{
+		$$ = new_ast_sym($3, STGCLASS_NA, SYM_ENUM_C, NULL,
+			@3.filename, @3.line);
+		$$->next = $1;
+	}
 ;
 
 enum_constant_def:
-	IDENT
+	IDENT	{$$ = $1;}
 	// IDENT '=' expr // circle back when combining with parser
 ;
 
@@ -325,10 +347,6 @@ component_declarator:
 |	declarator ':' NUM
 ;
 
-typedef_name:
-	IDENT
-;
-
 type_name:
 	declaration_spec
 |	declaration_spec abstract_declarator
@@ -426,6 +444,16 @@ direct_abstract_declarator:
 ident_list:
 	IDENT
 |	param_list ',' IDENT
+;
+
+ident_opt:
+	%empty	{$$ = NULL;}
+|	IDENT	{$$ = $1;}
+;
+
+comma_opt:
+	%empty
+|	','
 ;
 
 %%
