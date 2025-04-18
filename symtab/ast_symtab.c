@@ -48,14 +48,12 @@ union ast_type *new_ast_ary(TypedNumber size, ast_data_t *elem){
     return node;
 }
 
-union ast_type *new_ast_func(char is_complete, int is_inline,
-        ast_data_t *ret, ast_tab_t *params){
+union ast_type *new_ast_func(char is_complete, ast_data_t *ret, ast_tab_t *params){
     struct ast_func *func;
     union ast_type *node;
 
     func = calloc(1, sizeof(struct ast_func));
     func->is_complete = is_complete;
-    func->is_inline = is_inline;
     func->ret = ret;
     func->params = params;
 
@@ -200,13 +198,14 @@ int del_ast_data(ast_data_t *data) {
     return 0;
 }
 
-ast_sym_t *new_ast_sym(char *name, char stg_type, ast_data_t *data,
-        char *filename, int line){
+ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
+    ast_data_t *data, char *filename, int line){
     ast_sym_t *sym;
 
     sym = calloc(1, sizeof(ast_sym_t));
     sym->name = name;
     sym->stg_type = stg_type;
+    sym->sym_type = sym_type;
     sym->data = data;
     sym->filename = filename;
     sym->line = line;

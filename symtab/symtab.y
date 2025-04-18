@@ -114,14 +114,63 @@ declaration:
 // declaration specifiers
 
 declaration_spec:
-	stgclass_spec	{$$ = new_ast_sym(NULL, $1, NULL, @1.filename, @1.line);}
-|	type_spec	{$$ = new_ast_sym(NULL, 0, $1, @1.filename, @1.line);}
-|	qual_spec	{$$ = new_ast_sym(NULL, 0, new_ast_data(0, DATA_NONE, $1, NULL), @1.filename, @1.line);}
-|	func_spec	{$$ = new_ast_sym(NULL, 0, new_ast_data(0, DATA_FUNC, QUAL_NONE, new_ast_func(0, 1, NULL, NULL)), @1.filename, @1.line);}
-|	stgclass_spec declaration_spec	{$$.}
-|	qual_spec declaration_spec
-|	func_spec declaration_spec
-|	type_spec declaration_spec
+	stgclass_spec	{
+		$$ = new_ast_sym(NULL, $1, SYM_NONE, NULL,
+			@1.filename, @1.line);
+		}
+|	type_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE, $1,
+			@1.filename, @1.line);
+		}
+|	qual_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+			new_ast_data(0, DATA_NONE, $1, NULL),
+			@1.filename, @1.line);
+		}
+|	func_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_FUNC,
+			new_ast_data(0, DATA_FUNC, QUAL_NONE, NULL),
+			@1.filename, @1.line);
+		$$.is_inline = 1;
+		}
+|	stgclass_spec declaration_spec {
+		if ($2->stg_type != STG_NONE && $2->stg_type != $1) {
+			/*ERROR*/
+		} else {
+			$2->stg_type = $1;
+		}
+		$$ = $2;
+	}
+|	qual_spec declaration_spec {
+		if ($2->data == NULL) {
+			$2->data = new_ast_data(0, DATA_NONE, $1, NULL);
+		} else {
+			$2->data->qual |= $1;
+		}
+		$$ = $2;
+	}
+|	func_spec declaration_spec {
+		if ($2->sym_type != SYM_NONE && $2->sym_type != SYM_FUNC) {
+			/*ERROR*/
+		} else {
+			$2->sym_type = SYM_FUNC;
+		}
+		/* if ($2->data == NULL) {
+			$2->data = new_ast_data(0, DATA_FUNC, QUAL_NONE, NULL);
+		} else {
+			$2->data->data_type = DATA_FUNC;
+		}*/
+		$2->is_inline = 1;
+		$$ = $2;
+	}
+|	type_spec declaration_spec {
+		if ($2->data != NULL) {
+			/*ERROR*/
+		} else {
+			$2->data = $1;
+		}
+		$$ = $2;
+	}	
 ;
 
 stgclass_spec:

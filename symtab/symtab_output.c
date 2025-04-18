@@ -154,9 +154,6 @@ int print_data(ast_data_t *data, int num_tabs) {
             if (!data->node->func->is_complete) {
                 printf("incomplete ");
             }
-            if (data->node->func->is_inline) {
-                printf("inline ");
-            }
             printf("function with return type\n");
             print_data(data->node->func->ret, num_tabs + 1);
             print_indent(num_tabs);

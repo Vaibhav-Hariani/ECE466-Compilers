@@ -143,6 +143,7 @@ struct ast_sym {
     char *name;
     char stg_type;
     char sym_type;
+    char is_inline;
     int offset;
     ast_data_t *data;
 };
@@ -170,7 +171,6 @@ struct ast_param {
 // but not necessarily so per standard.
 struct ast_func {
     char is_complete;
-    char is_inline;
     ast_data_t *ret;
     ast_tab_t *params;
 };
@@ -202,8 +202,7 @@ union ast_type *new_ast_scal(char unsign, char scal_type);
 union ast_type *new_ast_ptr(ast_data_t *to);
 union ast_type *new_ast_ary(TypedNumber size, ast_data_t *elem);
 union ast_type *new_ast_param(ast_data_t *is);
-union ast_type *new_ast_func(char is_complete, int is_inline,
-    ast_data_t *ret, ast_tab_t *params);
+union ast_type *new_ast_func(char is_complete, ast_data_t *ret, ast_tab_t *params);
 union ast_type *new_ast_stru(char is_complete, ast_tab_t *minitab);
 union ast_type *new_ast_unio(char is_complete, ast_tab_t *minitab);
 union ast_type *new_ast_enu(ast_tab_t *minitab);
@@ -220,8 +219,8 @@ int del_ast_data(ast_data_t *data);
 // class and data type and returns its address. Assumes name,
 // data type and filename are dynamically allocated and uses
 // their same addresses.
-ast_sym_t *new_ast_sym(char *name, char stg_type, ast_data_t *data,
-    char *filename, int line);
+ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
+    ast_data_t *data, char *filename, int line);
 
 // Destroys symbol table entry pointed to by sym and all
 // storage it consumes. Returns a pointer to the next
