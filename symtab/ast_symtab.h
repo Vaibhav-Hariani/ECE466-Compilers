@@ -87,6 +87,7 @@ typedef struct ast_data ast_data_t;
 
 // Contains an ast for some data type.
 struct ast_data {
+    int size;
     char data_type;
     char qual;
     union ast_type {
@@ -208,7 +209,7 @@ struct ast_label *new_ast_label(char is_complete);
 
 // Creates ast_data_t object with specified type, qualifiers
 // and type node and returns its address.
-ast_data_t *new_ast_data(char data_type, char qual, union ast_type *node);
+ast_data_t *new_ast_data(int size, char data_type, char qual, union ast_type *node);
 
 // Recursively frees data type pointed to by data.
 int del_ast_data(ast_data_t *data);

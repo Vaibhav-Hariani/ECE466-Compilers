@@ -98,10 +98,11 @@ struct ast_label *new_ast_label(char is_complete){
     return label;
 }
 
-ast_data_t *new_ast_data(char data_type, char qual, union ast_type *node){
+ast_data_t *new_ast_data(int size, char data_type, char qual, union ast_type *node){
     ast_data_t *data;
 
     data = calloc(1, sizeof(ast_data_t));
+    data->size = size;
     data->data_type = data_type;
     data->qual = qual;
     
