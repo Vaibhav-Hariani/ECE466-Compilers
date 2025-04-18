@@ -65,7 +65,20 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 }
 
 
-%nterm <node> prog term_expr expr binop_expr ternop_expr unop_expr assign_expr arg_list 
+%nterm <node> prog term_expr expr binop_expr ternop_expr unop_expr assign_expr
+%nterm <data> type_spec 
+%nterm <sym> declaration_spec
+%nterm <tab>
+%nterm <scal>
+%nterm <var>
+%nterm <ptr>
+%nterm <ary>
+%nterm <param>
+%nterm <func>
+%nterm <stru>
+%nterm <unio>
+%nterm <enu>
+%nterm <label>
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;

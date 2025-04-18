@@ -245,12 +245,13 @@ ast_tab_t *del_ast_tab(ast_tab_t *tab);
 // entry if it exists, NULL otherwise.
 ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type);
 
-// Attempts to enter the symbol pointed to by sym into the
-// table pointed to by tab. If replace_dup is 0, an error
-// occurs if a symbol with the same name and namespace
-// exists; otherwise, such a symbol is replaced. Returns 0
-// on entry, 1 on replacement, 2 on error. On replacement,
-// sym will change to point to the symbol in the tab.
+// Attempts to enter the symbol list pointed to by sym and
+// the chain of next ast_sym_t *s into the table pointed to
+// by tab. If replace_dup is 0, an error occurs if a symbol
+// with the same name and namespace exists; otherwise, such a
+// symbol is replaced. Returns 0 on entry, 1 on replacement,
+// 2 on error. On replacement, sym will change to point to
+// the symbol in the tab.
 int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
 
 #endif // AST_SYMTAB_H

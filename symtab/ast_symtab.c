@@ -292,8 +292,11 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type) {
 }
 
 int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
-    ast_sym_t *old;
+    ast_sym_t *old, *next;
+    int namespace;
 
+    next = sym->next;
+    sym->next = NULL;
     old = lookup(tab, sym->name, sym->sym_type);
     if (old != NULL && old->tab == tab) {
         if (replace_dup) {
@@ -314,8 +317,39 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
             sym = old;
             return 1;
         } else {
-            // ERROR
+            // ERROR symbol already defined, cant replace
+            return 2;
+        }
+    } else {
+        namespace = NS_MISC;
+        if (sym->sym_type == SYM_LABEL){
+            namespace = NS_LABEL;
+        } else if (sym->sym_type >= SYM_STRU_M) {
+            namespace = NS_MEMB;
+        } else if (sym->sym_type >= SYM_STRU_T) {
+            namespace = NS_TAG;
+        }
+
+        switch (namespace) {
+            case NS_MISC:
+                sym->next = tab->misc;
+                tab->misc = sym;
+                break;
+            case NS_TAG:
+                sym->next = tab->tag;
+                tab->tag = sym;
+                break;
+            case NS_MEMB:
+                sym->next = tab->memb;
+                tab->memb = sym;
+                break;
+            case NS_LABEL:
+                sym->next = tab->label;
+                tab->label = sym;
+                break;
         }
     }
+    
+    enter(tab, next, replace_dup);
     return 0;
 }
