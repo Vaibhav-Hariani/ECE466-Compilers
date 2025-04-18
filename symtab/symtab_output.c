@@ -13,21 +13,20 @@ void print_indent(int num_tabs) {
     printf("%s", tab_arr);
 }
 
-int print_qual(int qual) {
+int print_qual(char qual) {
     if (qual & QUAL_CONST) {
         printf("const ");
     } if (qual & QUAL_VOLATILE) {
         printf("volatile ");
     } if (qual & QUAL_RESTRICT) {
         printf("restrict ");
-    } if (qual & QUAL_SIGNED) {
-        printf("signed ");
-    } else if (qual & QUAL_UNSIGNED) {
-        printf("unsigned ");
     }
 }
 
-int print_scal(int scal_type) {
+int print_scal(char unsign, char scal_type) {
+    if (unsign) {
+        printf("unsigned ");
+    }
     switch (scal_type) {
         // we like to have a little bit of fun around here
         case SCAL_LONGLONG:
@@ -37,6 +36,9 @@ int print_scal(int scal_type) {
         case SCAL_INT:
             printf("int\n");
             break;
+        case SCAL_SHORT:
+            printf("short int");
+            break;
         case SCAL_LONGDOUB:
             printf("long ");
         case SCAL_DOUB:
@@ -44,6 +46,9 @@ int print_scal(int scal_type) {
             break;
         case SCAL_FLOAT:
             printf("float\n");
+            break;
+        case SCAL_CHAR:
+            printf("char\n");
             break;
         case SCAL_VOID:
             printf("void\n");
@@ -131,7 +136,7 @@ int print_data(ast_data_t *data, int num_tabs) {
     print_qual(data->qual);
     switch (data->data_type) {
         case DATA_SCAL:
-            print_scal(data->node->scal->scal_type);
+            print_scal(data->node->scal->unsign, data->node->scal->scal_type);
             break;
         case DATA_PTR:
             printf("pointer to\n");

@@ -39,12 +39,28 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 	TypedNumber n;
     SizedString s;
     ast_node *node;
-} 
+    ast_data_t *data;
+    ast_sym_t *sym;
+    ast_tab_t *tab;
+	struct ast_scal *scal;
+	struct ast_var *var;
+	struct ast_ptr *ptr;
+	struct ast_ary *ary;
+	struct ast_param *param;
+	struct ast_func *func;
+	struct ast_stru *stru;
+	struct ast_unio *unio;
+	struct ast_enu *enu;
+	struct ast_label *label;
+}
+
 %code requires {
     #include "yylval.h"
     #include "ast_nodes.h"
+    #include "ast_symtab.h"
     #include <stdio.h>
     #include "parse_output.h"
+    #include "symtab_output.h"
     void yyerror(const char * s);
 }
 
@@ -62,158 +78,282 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 // as such, they can be ternarys, pointers, or identifiers. Nothing else.
 //unops take in an lvalue, and do one of 3 operations to them.
 
-prog: %empty {$$=0;}
-| prog term_expr ';'  {$$ = print_ast($2);}
+// prog: %empty {$$=0;}
+// | prog term_expr ';'  {$$ = print_ast($2);}
+// ;
+
+declaration:
+	declaration_spec ';'
+|	declaration_spec init_declatator_list ';'
 ;
 
-term_expr: assign_expr {$$=$1;}
-|   term_expr ',' assign_expr {$$ = new_ast_double(AST_binop, $1, $3, ',');} 
+// declaration specifiers
 
-expr: NUM {$$ = new_ast_num($1);}
-|   IDENT {$$ = new_ast_ident($1);}
-|   CHARLIT {$$ = new_ast_charlit($1);}
-|   STRING {$$ = new_ast_string($1);}
-|   '(' term_expr ')'            {$$=$2;}
+declaration_spec:
+	stgclass_spec
+|	type_spec
+|	qual_spec
+|	func_spec
+|	stgclass_spec declaration_spec
+|	qual_spec declaration_spec
+|	func_spec declaration_spec
+|	type_spec declaration_spec
 ;
 
-unop_expr: expr {$$=$1;}
-|   unop_expr "++" %prec POSTFIX { $$ = new_ast_single($1, PLUSPLUS, POSTFIX);}
-|   unop_expr "--" %prec POSTFIX { $$ = new_ast_single($1, MINUSMINUS, POSTFIX);}
-|   "++" unop_expr %prec PREFIX  { $$ = new_ast_single($2, PLUSPLUS, PREFIX);}
-|   "--" unop_expr %prec PREFIX  { $$ = new_ast_single($2, MINUSMINUS, PREFIX);}
-|   unop_expr INDSEL IDENT       { $$=new_ast_double(AST_binop, $1, new_ast_ident($3), INDSEL);}
-|   unop_expr '.' IDENT          { $$ = new_ast_double(AST_binop, $1, new_ast_ident($3), '.');}
-//Helper function that should expand this into what it actually is
-|   unop_expr '['term_expr']'    { $$= ast_array_exp($1,$3);}
-|   unop_expr '(' arg_list ')'   { $$=new_ast_double(AST_funct, $1, $3, ')');}
-|   '+' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '+', PREFIX);}
-|   '-' unop_expr %prec SIZEOF   { $$= new_ast_single($2, '-', PREFIX);}
-|   '!' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '!', PREFIX);}
-|   '~' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '~', PREFIX);}
-|   '&' unop_expr %prec SIZEOF   { $$ = new_ast_single($2, '&', PREFIX);}
-|    '*' unop_expr %prec SIZEOF  { $$ = new_ast_single($2, '*', PREFIX);}
-|   SIZEOF unop_expr {$$ = new_ast_single($2, SIZEOF, PREFIX);}
+stgclass_spec:
+	EXTERN
+|	STATIC
+|	AUTO
+|	REGISTER
+|	TYPEDEF
 ;
 
-
-binop_expr: unop_expr {$$=$1;}
-|   binop_expr '+' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '+');}
-|   binop_expr '-' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '-');}
-|   binop_expr '*' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '*');}
-|   binop_expr '/' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '/');}
-|   binop_expr '%' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '%');}
-|   binop_expr '>' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '>');}
-|   binop_expr '<' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '<');}
-|	binop_expr '&' binop_expr 	     { $$=new_ast_double(AST_binop, $1, $3, '&');}
-|	binop_expr '|' binop_expr 	     { $$=new_ast_double(AST_binop, $1, $3, '|');}
-|   binop_expr '^' binop_expr        { $$=new_ast_double(AST_binop, $1, $3, '^');}
-|   binop_expr SHL binop_expr 	     { $$=new_ast_double(AST_binop, $1, $3, SHL);}
-|	binop_expr SHR binop_expr  	     { $$=new_ast_double(AST_binop, $1, $3, SHR);}
-|	binop_expr EQEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, EQEQ);}
-|	binop_expr NOTEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, NOTEQ);}
-|	binop_expr LOGAND binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, LOGAND);}
-|	binop_expr LOGOR binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, LOGOR);}
-|   binop_expr LTEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, LTEQ);}
-|	binop_expr GTEQ binop_expr  	 { $$=new_ast_double(AST_binop, $1, $3, GTEQ);}
-
-ternop_expr: binop_expr { $$=$1;}
-| binop_expr '?' binop_expr ':' binop_expr { $$=new_ast_ternop(AST_ternop, $1, $3, $5);};
-
-assign_expr: ternop_expr {$$=$1;}
-|   unop_expr '=' assign_expr      { $$=new_ast_double(AST_assign, $1, $3, '=');}
-|	unop_expr TIMESEQ assign_expr	 { $$=new_ast_double(AST_assign, $1, $3, TIMESEQ);}
-|	unop_expr DIVEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, DIVEQ);}
-|	unop_expr MODEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, MODEQ);}
-|	unop_expr PLUSEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, PLUSEQ);}
-|	unop_expr MINUSEQ assign_expr  { $$=new_ast_double(AST_assign, $1, $3, MINUSEQ);}
-|	unop_expr SHLEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
-|	unop_expr SHREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
-|	unop_expr ANDEQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, ANDEQ);}
-|	unop_expr OREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, OREQ);}
-|	unop_expr XOREQ assign_expr 	 { $$=new_ast_double(AST_assign, $1, $3, XOREQ);}
+qual_spec:
+|	CONST
+|	VOLATILE
+|	RESTRICT
 ;
 
-arg_list: %empty { $$ = new_ast_list(0);} 
-|   assign_expr { $$=new_ast_list($1);}
-|   arg_list ',' assign_expr %prec POSTFIX { $$ = append_ast_list($1, $3);}
+func_spec:
+	INLINE
 ;
 
-declaration: decl_spec init_list ';'
-
-init_list: %empty
-|   init_decl
-|   init_list ',' init_decl   
+type_spec:
+	enum_type_spec
+|	float_type_spec
+|	int_type_spec
+|	struct_type_spec
+|	union_type_spec
+|	VOID
+|	typedef_name
 ;
 
-// The second line is optional
-init_decl: declarator
-|   declarator = init
+enum_type_spec:
+	enum_type_def
+|	enum_type_ref
 ;
 
-
-decl_spec: %empty
-| storage_class decl_spec
-| type_spec decl_spec
-| type_qual decl_spec
-| function_spec decl_spec
-
-storage_class: EXTERN
-|   STATIC
-|   TYPEDEF
-|   STATIC
-|   AUTO
-|   REGISTER
+enum_type_def:
+	ENUM '{' enum_def_list '}'
+|	ENUM '{' enum_def_list ',' '}'
+|	ENUM IDENT '{' enum_def_list '}'
+|	ENUM IDENT'{' enum_def_list ',' '}'
 ;
 
-type_spec:   VOID
-|   CHAR
-|   SHORT
-|   INT
-|   LONG
-|   FLOAT
-|   DOUBLE
-|   SIGNED
-|   UNSIGNED
-|   BOOL
-|   COMPLEX
-|   struct_union_spec
-|   enum_spec //Optional 
-|   typedef_name //Also optional
+enum_type_ref:
+	ENUM IDENT
 ;
 
-struct_union_spec: STRUCT '{' struct_decl_list '}'
-|   STRUCT IDENT '{' struct_decl_list '}'
-|   STRUCT IDENT
-|   UNION '{' struct_decl_list '}'
-|   UNION IDENT '{' struct_decl_list '}'
-|   UNION IDENT
+enum_def_list:
+	enum_constant_def
+|	enum_def_list ',' enum_constant_def
 ;
-struct_decl_list: struct_decl
-| struct_decl_list struct_decl
+
+enum_constant_def:
+	IDENT
+	// IDENT '=' expr // circle back when combining with parser
 ;
-struct_decl:    spec_quali_list struct_decl
 
-
-function_spec: 
-
-
-/* keyword: STRUCT IDENT
-| CHAR
-| BOOL    :) slomp blup 
-| COMPLEX
-| mult_keyword COMPLEX
-| IMAGINARY
-| mult_keyword IMAGINARY
-
-| 
-
-mult_keyword: LONG
-| DOUBLE
-| FLOAT
-| mult_keyword mult_keyword
-
+float_type_spec:
+	FLOAT
+|	DOUBLE
+|	LONG DOUBLE
+|	FLOAT COMPLEX
+|	DOUBLE COMPLEX
+|	LONG DOUBLE COMPLEX
 ;
- */
+
+int_type_spec:
+	signed_type_spec
+|	unsigned_type_spec
+|	char_type_spec
+|	BOOL
+;
+
+signed_type_spec:
+	SHORT
+|	SHORT INT
+|	SIGNED SHORT
+|	SIGNED SHORT INT
+|	INT
+|	SIGNED INT
+|	SIGNED
+|	LONG
+|	LONG INT
+|	SIGNED LONG
+|	SIGNED LONG INT
+|	LONG LONG
+|	LONG LONG INT
+|	SIGNED LONG LONG
+|	SIGNED LONG LONG INT
+;
+
+unsigned_type_spec:
+	UNSIGNED SHORT
+|	UNSIGNED SHORT INT
+|	UNSIGNED INT
+|	UNSIGNED
+|	UNSIGNED LONG
+|	UNSIGNED LONG INT
+|	UNSIGNED LONG LONG
+|	UNSIGNED LONG LONG INT
+;
+
+char_type_spec:
+	CHAR
+|	SIGNED CHAR
+|	UNSIGNED CHAR
+;
+
+struct_type_spec:
+	struct_type_def
+|	struct_type_ref
+;
+
+struct_type_def:
+	STRUCT '{' field_list '}'
+|	STRUCT IDENT '{' field_list '}'
+;
+
+struct_type_ref:
+	STRUCT IDENT
+;
+
+union_type_spec:
+	union_type_def
+|	union_type_ref
+;
+
+union_type_def:
+	UNION '{' field_list '}'
+|	UNION IDENT '{' field_list '}'
+;
+
+union_type_ref:
+	UNION IDENT
+;
+field_list:
+	component_declaration
+|	field_list component_declaration
+;
+
+component_declaration:
+	type_spec component_declarator_list ';'
+;
+
+component_declarator_list:
+	component_declarator
+|	component_declarator_list ',' component_declarator
+;
+
+component_declarator:
+	declarator
+|	':' NUM // bit field width should be constant expression, not NUM
+|	declarator ':' NUM
+;
+
+typedef_name:
+	IDENT
+;
+
+type_name:
+	declaration_spec
+|	declaration_spec abstract_declarator
+;
+
+// declarators
+
+init_declarator_list:
+	init_declarator_list
+|	init_declarator_list ',' init_declarator
+;
+
+init_declarator:
+	declarator
+// |	declarator '=' init // circle back later, h&s 4.6. involves parser
+;
+
+declarator:
+	pointer_declarator
+|	direct_declarator
+;
+
+pointer_declarator:
+	pointer direct_declarator
+;
+
+pointer:
+	'*'
+|	'*' qual_spec_list
+|	'*' pointer
+|	'*' qual_spec_list pointer
+;
+
+qual_spec_list:
+	qual_spec
+|	qual_spec_list qual_spec
+;
+
+direct_declarator:
+	simple_declarator
+|	'(' declarator ')'
+|	array_declarator
+|	function_declarator
+;
+
+simple_declarator:
+	IDENT
+;
+
+array_declarator:
+	direct_declarator '[' ']'
+|	direct_declarator '[' NUM ']' // our simplification
+;
+
+function_declarator:
+	direct_declarator '{' '}'
+|	direct_declarator '{' param_type_list '}'
+|	direct_declarator '{' ident_list '}'	
+;
+
+param_type_list:
+	param_list
+|	param_list ',' '...'
+;
+
+param_list:
+	param_declaration
+|	param_list ',' param_declaration
+;
+
+param_declaration:
+	declaration_spec declarator
+|	declaration_spec abstract_declarator
+|	declaration_spec
+;
+
+abstract_declarator:
+	pointer
+|	pointer direct_abstract_declarator
+|	direct_abstract_declarator
+;
+
+direct_abstract_declarator:
+	'(' abstract_declarator ')'
+|	'[' ']'
+|	'[' NUM ']'
+|	direct_abstract_declarator '[' ']'
+|	direct_abstract_declarator '[' NUM ']'
+|	'(' ')'
+|	'(' param_type_list')'
+|	direct_abstract_declarator '(' ')'
+|	direct_abstract_declarator '(' param_type_list')'
+;	
+
+ident_list:
+	IDENT
+|	param_list ',' IDENT
+;
 
 %%
 

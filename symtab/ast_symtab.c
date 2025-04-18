@@ -5,10 +5,11 @@
 
 #include "symtab.tab.h"
 
-struct ast_scal *new_ast_scal(char scal_type){
+struct ast_scal *new_ast_scal(char unsign, char scal_type){
     struct ast_scal *scal;
 
     scal = calloc(1, sizeof(struct ast_scal));
+    scal->unsign = unsign;
     scal->scal_type = scal_type;
     return scal;
 }
@@ -29,16 +30,21 @@ struct ast_ptr *new_ast_ptr(ast_data_t *to){
     return ptr;
 }
 
-struct ast_ary *new_ast_ary(int size, ast_data_t *elem){
+struct ast_ary *new_ast_ary(TypedNumber size, ast_data_t *elem){
     struct ast_ary *ary;
 
     ary = calloc(1, sizeof(struct ast_ary));
     ary->elem = elem;
-    ary->size = size;
+    if (size.type > TYPE_ULLI // floating point
+    || (size.type % 2 == 0 && size.val.i < 0) // negative
+    /*|| (unsigned long long) size.val.i >= some size limit?*/) {
+        // ERROR invalid array size
+    }
+    ary->size = size.val.i;
     return ary;
 }
 
-struct ast_func *new_ast_func(int is_complete, int is_inline,
+struct ast_func *new_ast_func(char is_complete, int is_inline,
         ast_data_t *ret, ast_tab_t *params){
     struct ast_func *func;
 
@@ -78,13 +84,21 @@ struct ast_unio *new_ast_unio(char is_complete, ast_tab_t *minitab){
 
 struct ast_enu *new_ast_enu(ast_tab_t *minitab){
     struct ast_enu *enu;
-
+ 
     enu = calloc(1, sizeof(struct ast_enu));
     enu->minitab = minitab;
     return enu;
 }
 
-ast_data_t *new_ast_data(char data_type, char qual, void *node){
+struct ast_label *new_ast_label(char is_complete){
+    struct ast_label *label;
+ 
+    label = calloc(1, sizeof(struct ast_label));
+    label->is_complete = is_complete;
+    return label;
+}
+
+ast_data_t *new_ast_data(char data_type, char qual, union ast_type *node){
     ast_data_t *data;
 
     data = calloc(1, sizeof(ast_data_t));
@@ -93,31 +107,31 @@ ast_data_t *new_ast_data(char data_type, char qual, void *node){
     
     switch (data_type) {
         case DATA_SCAL:
-            data->node->scal = (struct ast_scal *) node;
+            data->node->scal = node->scal;
             break;
         case DATA_PTR:
-            data->node->ptr = (struct ast_ptr *) node;
+            data->node->ptr = node->ptr;
             break;
         case DATA_ARY:
-            data->node->ary = (struct ast_ary *) node;
+            data->node->ary = node->ary;
             break;
         case DATA_FUNC:
-            data->node->func = (struct ast_func *) node;
+            data->node->func = node->func;
             break;
         case DATA_PARAM:
-            data->node->param = (struct ast_param *) node;
+            data->node->param = node->param;
             break;
         case DATA_STRU:
-            data->node->stru = (struct ast_stru *) node;
+            data->node->stru = node->stru;
             break;
         case DATA_UNIO:
-            data->node->unio = (struct ast_unio *) node;
+            data->node->unio = node->unio;
             break;
         case DATA_ENU:
-            data->node->enu = (struct ast_enu *) node;
+            data->node->enu = node->enu;
             break;
         case DATA_LABEL:
-            data->node->label = (struct ast_label *) node;
+            data->node->label = node->label;
             break;
     }
 
@@ -282,6 +296,8 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
     old = lookup(tab, sym->name, sym->sym_type);
     if (old != NULL && old->tab == tab) {
         if (replace_dup) {
+            // external refdefinitions? see h&s 4.2.5
+
             // potentially have to check if types are compatible.
             // if compatible, we might have to construct
             // a composite type, which we can do in old by combing

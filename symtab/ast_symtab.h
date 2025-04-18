@@ -51,12 +51,14 @@ enum data_type {
 };
 
 enum scal_type {
-    SCAL_INT=0,
+    SCAL_SHORT=0,
+    SCAL_INT,
     SCAL_LONG,
     SCAL_LONGLONG,
     SCAL_FLOAT,
     SCAL_DOUB,
     SCAL_LONGDOUB,
+    SCAL_CHAR,
     SCAL_VOID
 };
 
@@ -73,11 +75,9 @@ enum stg_type {
 // get/set with bitwise operations
 // don't ask me why i did it this way
 enum qual_type {
-    QUAL_SIGNED = 1,    // 00001
-    QUAL_UNSIGNED = 2,  // 00010
-    QUAL_CONST = 4,     // 00100
-    QUAL_VOLATILE = 8,  // 01000
-    QUAL_RESTRICT = 16  // 10000
+    QUAL_CONST = 1,     // 001
+    QUAL_VOLATILE = 2,  // 010
+    QUAL_RESTRICT = 3  // 100
 };
 
 
@@ -89,7 +89,7 @@ typedef struct ast_data ast_data_t;
 struct ast_data {
     char data_type;
     char qual;
-    union {
+    union ast_type {
         struct ast_scal *scal;
         struct ast_ptr *ptr;
         struct ast_ary *ary;
@@ -140,6 +140,7 @@ struct ast_sym {
 };
 
 struct ast_scal {
+    char unsign;
     char scal_type;
 };
 
@@ -164,8 +165,8 @@ struct ast_param {
 // note: scope is always file/global per gcc
 // but not necessarily so per standard.
 struct ast_func {
-    int is_complete;
-    int is_inline;
+    char is_complete;
+    char is_inline;
     ast_data_t *ret;
     ast_tab_t *params;
 };
@@ -190,24 +191,24 @@ struct ast_enu {
 
 // note: scope is always function
 struct ast_label {
-    int is_complete;
+    char is_complete;
 };
 
-struct ast_scal *new_ast_scal(char scal_type);
+struct ast_scal *new_ast_scal(char unsign, char scal_type);
 struct ast_var *new_ast_var(ast_data_t *is);
 struct ast_ptr *new_ast_ptr(ast_data_t *to);
-struct ast_ary *new_ast_ary(int size, ast_data_t *elem);
+struct ast_ary *new_ast_ary(TypedNumber size, ast_data_t *elem);
 struct ast_param *new_ast_param(ast_data_t *is);
-struct ast_func *new_ast_func(int is_complete, int is_inline,
+struct ast_func *new_ast_func(char is_complete, int is_inline,
     ast_data_t *ret, ast_tab_t *params);
 struct ast_stru *new_ast_stru(char is_complete, ast_tab_t *minitab);
 struct ast_unio *new_ast_unio(char is_complete, ast_tab_t *minitab);
 struct ast_enu *new_ast_enu(ast_tab_t *minitab);
-struct ast_label *new_ast_label(int is_complete);
+struct ast_label *new_ast_label(char is_complete);
 
 // Creates ast_data_t object with specified type, qualifiers
 // and type node and returns its address.
-ast_data_t *new_ast_data(char data_type, char qual, void *node);
+ast_data_t *new_ast_data(char data_type, char qual, union ast_type *node);
 
 // Recursively frees data type pointed to by data.
 int del_ast_data(ast_data_t *data);
