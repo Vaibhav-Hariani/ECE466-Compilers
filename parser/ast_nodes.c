@@ -6,35 +6,35 @@
 
 #define new_ast_node calloc(1, sizeof(struct ast_node))
 
-ast_node* new_ast_ident(char* c) {
-  ast_node* node = new_ast_node;
+ast_node_t* new_ast_ident(char* c) {
+  ast_node_t* node = new_ast_node;
   node->type = AST_ident;
   node->obj.ident = c;
   return node;
 }
 
-ast_node* new_ast_num(TypedNumber n) {
-  ast_node* node = new_ast_node;
+ast_node_t* new_ast_num(TypedNumber n) {
+  ast_node_t* node = new_ast_node;
   node->type = AST_num;
   node->obj.num = n;
   return node;
 }
 
-ast_node* new_ast_charlit(char c) {
-  ast_node* node = new_ast_node;
+ast_node_t* new_ast_charlit(char c) {
+  ast_node_t* node = new_ast_node;
   node->type = AST_charlit;
   node->obj.charlit = c;
   return node;
 }
 
-ast_node* new_ast_string(SizedString s) {
-  ast_node* node = new_ast_node;
+ast_node_t* new_ast_string(SizedString s) {
+  ast_node_t* node = new_ast_node;
   node->type = AST_string;
   node->obj.str = s;
   return node;
 }
 
-ast_node* new_ast_lvalue(ast_node* expr) {
+ast_node_t* new_ast_lvalue(ast_node_t* expr) {
   expr->is_lval = 1;
   return expr;
 }
@@ -42,8 +42,8 @@ ast_node* new_ast_lvalue(ast_node* expr) {
 
 // Given that both both children of a binop are numbers or char literals, this should convert them into a new numlit/charlit.
 
-ast_node* new_ast_binop(int type, ast_node* expr1, ast_node* expr2, int op) {
-  ast_node* node = new_ast_node;
+ast_node_t* new_ast_binop(int type, ast_node_t* expr1, ast_node_t* expr2, int op) {
+  ast_node_t* node = new_ast_node;
   struct binop* bin = calloc(1, sizeof(struct binop));
 
   switch (type) {
@@ -91,9 +91,9 @@ ast_node* new_ast_binop(int type, ast_node* expr1, ast_node* expr2, int op) {
   return node;
 }
 
-ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2,
-                         ast_node* expr3) {
-  ast_node* node = new_ast_node;
+ast_node_t* new_ast_ternop(int type, ast_node_t* expr1, ast_node_t* expr2,
+                         ast_node_t* expr3) {
+  ast_node_t* node = new_ast_node;
   node->type = AST_ternop;
   struct ternop* obj = calloc(1, sizeof(struct ternop));
   obj->expr_1 = expr1;
@@ -103,8 +103,8 @@ ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2,
   return node;
 }
 
-ast_node* new_ast_unop(ast_node* expr, int op, int dir) {
-  ast_node* node = new_ast_node;
+ast_node_t* new_ast_unop(ast_node_t* expr, int op, int dir) {
+  ast_node_t* node = new_ast_node;
   node->type = AST_unop;
   struct unop* obj = calloc(1, sizeof(struct unop));
   obj->expr = expr;

@@ -19,84 +19,79 @@ enum node_type {
     AST_EMPTY,
 };
 
+typedef struct ast_node ast_node_t;
 
-struct ast_node typedef ast_node;
 struct binop {
-    ast_node* expr_1;
-    ast_node* expr_2;
+    ast_node_t* expr_1;
+    ast_node_t* expr_2;
     int opcode;
 };
 
 struct ternop {
-    ast_node* expr_1;
-    ast_node* expr_2;
-    ast_node* expr_3;
+    ast_node_t* expr_1;
+    ast_node_t* expr_2;
+    ast_node_t* expr_3;
 };
 
 struct lvalue {
-    ast_node* expr;
+    ast_node_t* expr;
 };
 
 
 struct assign {
-    ast_node* lvalue;
-    ast_node* rvalue;
+    ast_node_t* lvalue;
+    ast_node_t* rvalue;
     int opcode;
 };
 
 //Special struct for function calls
 struct special {
-    ast_node* expr_1;
-    ast_node* expr_2;
+    ast_node_t* expr_1;
+    ast_node_t* expr_2;
     int opcode;
 };
 
 
 struct unop {
-    ast_node* expr;
+    ast_node_t* expr;
     int opcode;
     int sequence;
 };
 
-typedef union ast_node_t {
-    struct binop* b;
-    struct ternop* t;
-    struct unop* u;
-    struct assign* a;
-    struct special* s;
-    //Non-recursive types can just live here
-    char charlit;
-    TypedNumber num;
-    SizedString str;
-    char* ident;
-} ast_node_t;
-
-
-struct ast_node { 
+struct ast_node {
     int is_lval;
     //Reference to what obj is
     int type;
     //the object itself
-    union ast_node_t obj;   
-} typedef ast_node;
+    union {
+        struct binop* b;
+        struct ternop* t;
+        struct unop* u;
+        struct assign* a;
+        struct special* s;
+        //Non-recursive types can just live here
+        char charlit;
+        TypedNumber num;
+        SizedString str;
+        char* ident;
+    } obj;
+};
 
+ast_node_t* new_ast_ident(char* c);
+ast_node_t* new_ast_num(TypedNumber n);
+ast_node_t* new_ast_charlit(char c);
 
+ast_node_t* new_ast_string(SizedString s);
 
-ast_node* new_ast_ident(char* c);
-ast_node* new_ast_num(TypedNumber n);
-ast_node* new_ast_charlit(char c);
-
-ast_node* new_ast_string(SizedString s);
-
-ast_node* new_ast_binop(int type, ast_node* expr1, ast_node* expr2, int op);
+ast_node_t* new_ast_binop(int type, ast_node_t* expr1, ast_node_t* expr2, int op);
 
 //Just sets a flag if desired
-ast_node* new_ast_lvalue(ast_node* expr);
+ast_node_t* new_ast_lvalue(ast_node_t* expr);
 
 
-ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2, ast_node* expr3);
+ast_node_t* new_ast_ternop(int type, ast_node_t* expr1, ast_node_t* expr2, ast_node_t* expr3);
 
-ast_node* new_ast_unop(ast_node* expr, int op, int dir);
+ast_node_t* new_ast_unop(ast_node_t* expr, int op, int dir);
 
 
 #endif

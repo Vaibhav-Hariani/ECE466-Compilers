@@ -35,7 +35,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 	char c;
 	TypedNumber n;
     SizedString s;
-    ast_node *node;
+    ast_node_t *node;
 } 
 %code requires {
     #include "yylval.h"

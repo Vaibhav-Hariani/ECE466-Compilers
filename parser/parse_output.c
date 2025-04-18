@@ -83,7 +83,7 @@ char** token_labels() {
   return tokens;
 }
 
-ast_node* print_ast(ast_node* expr) {
+ast_node_t* print_ast(ast_node_t* expr) {
   char** tokens = token_labels();
   print_recurse(expr, 0, tokens);
   return expr;
@@ -143,7 +143,7 @@ void print_special(struct special* s, int num_tabs, char** tokens) {
 // modular approach I'm thinking of using the enums as function pointers to
 // specific print functions. However, this bloated mess works for this
 // assignment that is currently much later than I (or you) would like
-void print_recurse(ast_node* expr, int num_tabs, char** tokens) {
+void print_recurse(ast_node_t* expr, int num_tabs, char** tokens) {
   char tab_arr[num_tabs + 1];
   char* c;
 
