@@ -16,17 +16,30 @@ enum sym_type {
     SYM_VAR = 0,
     SYM_TYPEDEF,
     SYM_FUNC,
-    SYM_ENUM_C,
+    SYM_ENU_C,
     SYM_PARAM,
     /*tags*/
-    SYM_STRUCT_T,
-    SYM_UNION_T,
-    SYM_ENUM_T,
+    SYM_STRU_T,
+    SYM_UNIO_T,
+    SYM_ENU_T,
     /*members*/
-    SYM_STRUCT_M,
-    SYM_UNION_M,
+    SYM_STRU_M,
+    SYM_UNIO_M,
     /*label*/
     SYM_LABEL
+};
+
+enum type_type {
+    TYPE_SCAL = 0,
+    TYPE_VAR,
+    TYPE_PTR,
+    TYPE_ARY,
+    TYPE_FUNC,
+    TYPE_PARAM,
+    TYPE_STRU,
+    TYPE_UNIO,
+    TYPE_ENU,
+    TYPE_LABEL
 };
 
 enum stg_type {
@@ -58,13 +71,16 @@ struct ast_type {
     char qual;
     union {
         struct ast_scal *scal;
+        struct ast_var *var;
         struct ast_ptr *ptr;
         struct ast_ary *ary;
         struct ast_func *func;
+        struct ast_param *param;
         struct ast_stru *stru;
         struct ast_unio *unio;
         struct ast_enu *enu;
-    } node;
+        struct ast_label *label;
+    } *node;
 };
 
 // Each symbol table contains a pointer
@@ -96,11 +112,16 @@ typedef struct ast_sym {
 
     char *name;
     char stg_type;
+    char sym_type;
     ast_type_t *type;
 } ast_sym_t;
 
 struct ast_scal {
     char scal_type;
+};
+
+struct ast_var {
+    ast_type_t *is;
 };
 
 struct ast_ptr {
@@ -112,11 +133,17 @@ struct ast_ary {
     ast_type_t *elem;
 };
 
+// note: special qualifier rules
+struct ast_param {
+    ast_type_t *is;
+};
+
 // note: scope is always file/global per gcc
 // but not necessarily so per standard.
 struct ast_func {
     ast_type_t *ret;
     struct ast_proto {
+        char *name;
         ast_type_t *param;
         struct ast_proto *next;
     } *param_list;
@@ -159,13 +186,49 @@ struct ast_enu {
     } *enumcs;
 };
 
+// note: scope is always function
+struct ast_label {
+    int is_complete;
+};
+
+struct ast_scal *new_ast_scal(char scal_type);
+struct ast_var *new_ast_var(ast_type_t *is);
+struct ast_ptr *new_ast_ptr(ast_type_t *to);
+struct ast_ary *new_ast_ary(int size, ast_type_t *elem);
+struct ast_param *new_ast_param(ast_type_t *is);
+struct ast_func *new_ast_func(ast_type_t *ret, struct ast_proto *param_list);
+struct ast_stru *new_ast_stru(char is_complete, struct ast_smembs *smembs);
+struct ast_unio *new_ast_unio(char is_complete, struct ast_umembs *umembs);
+struct ast_enu *new_ast_enu(struct ast_enumcs *enumcs);
+struct ast_label *new_ast_label(int is_complete);
+
+// Creates ast_type_t object with specified type, qualifiers
+// and type node and returns its address.
+ast_type_t *new_ast_type(char type, char qual, void *node);
+
+// Frees type pointed to by type, also freeing nested types.
+int del_ast_type(ast_type_t *type);
+
+// Creates ast_sym_t object with the specified name, storage
+// class and type and returns its address.
+ast_sym_t *new_ast_sym(char *name, char stg_type, ast_type_t *type,
+    char *filename, int line);
+
+// Destroys symbol table entry pointed to by sym and all
+// storage it consumes. Returns a pointer to the next
+// symbol in the table.
+ast_sym_t *del_ast_sym(ast_sym_t *sym);
+
 // Creates a new symbol table with scope type scope_type
 // whose enclosing scope has the symbol table pointed to
 // by parent.
 ast_tab_t *new_ast_tab(ast_tab_t *parent, char scope_type);
 
-// Destroys symbol table and all storage it consumes.
-int del_ast_tab(ast_tab_t *tab);
+// Destroys symbol table pointed to by tab and all storage
+// it consumes. Changes the current scope/the symbol
+// table pointed to by curr to the enclosing scope/symbol
+// table.
+int del_ast_tab(ast_tab_t *tab, ast_tab_t *curr);
 
 // Searches for symbol called name in the appropriate
 // namespace for sym_type in symbol table pointed to by
@@ -180,28 +243,5 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type);
 // exists; otherwise, such a symbol is replaced. Returns 0
 // on entry, 1 on replacement, 2 on error.
 int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
-
-// Creates ast_sym_t object with the specified name, storage
-// class and type and returns its address.
-ast_sym_t *new_ast_sym(char *name, char stg_type, ast_type_t *type,
-    char *filename, int line);
-
-// Creates ast_type_t object with specified type, qualifiers
-// and type node and returns its address.
-ast_type_t *new_ast_type(char type, char qual, void *node);
-
-struct ast_scal *new_ast_scal(char scal_type);
-
-struct ast_ptr *new_ast_ptr(ast_type_t *to);
-
-struct ast_ary *new_ast_ary(int size, ast_type_t *elem);
-
-struct ast_func *new_ast_func(ast_type_t *ret, struct ast_proto *param_list);
-
-struct ast_stru *new_ast_stru(char is_complete, struct ast_smembs *smembs);
-
-struct ast_unio *new_ast_unio(char is_complete, struct ast_umembs *umembs);
-
-struct ast_enu *new_ast_enu(struct ast_enumcs *enumcs);
 
 #endif // AST_SYMTAB_H
