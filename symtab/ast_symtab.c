@@ -5,33 +5,34 @@
 
 #include "symtab.tab.h"
 
-struct ast_scal *new_ast_scal(char unsign, char scal_type){
+union ast_type *new_ast_scal(char unsign, char scal_type){
     struct ast_scal *scal;
+    union ast_type *node;
 
     scal = calloc(1, sizeof(struct ast_scal));
     scal->unsign = unsign;
     scal->scal_type = scal_type;
-    return scal;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->scal = scal;
+    return node;
 }
 
-struct ast_var *new_ast_var(ast_data_t *is){
-    struct ast_var *var;
-
-    var = calloc(1, sizeof(struct ast_var));
-    var->is = is;
-    return var;
-}
-
-struct ast_ptr *new_ast_ptr(ast_data_t *to){
+union ast_type *new_ast_ptr(ast_data_t *to){
     struct ast_ptr *ptr;
+    union ast_type *node;
 
     ptr = calloc(1, sizeof(struct ast_ptr));
     ptr->to = to;
-    return ptr;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->ptr = ptr;
+    return node;
 }
 
-struct ast_ary *new_ast_ary(TypedNumber size, ast_data_t *elem){
+union ast_type *new_ast_ary(TypedNumber size, ast_data_t *elem){
     struct ast_ary *ary;
+    union ast_type *node;
 
     ary = calloc(1, sizeof(struct ast_ary));
     ary->elem = elem;
@@ -41,61 +42,88 @@ struct ast_ary *new_ast_ary(TypedNumber size, ast_data_t *elem){
         // ERROR invalid array size
     }
     ary->size = size.val.i;
-    return ary;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->ary = ary;
+    return node;
 }
 
-struct ast_func *new_ast_func(char is_complete, int is_inline,
+union ast_type *new_ast_func(char is_complete, int is_inline,
         ast_data_t *ret, ast_tab_t *params){
     struct ast_func *func;
+    union ast_type *node;
 
     func = calloc(1, sizeof(struct ast_func));
     func->is_complete = is_complete;
     func->is_inline = is_inline;
     func->ret = ret;
     func->params = params;
-    return func;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->func = func;
+    return node;
 }
 
-struct ast_param *new_ast_param(ast_data_t *is){
+union ast_type *new_ast_param(ast_data_t *is){
     struct ast_param *param;
+    union ast_type *node;
 
     param = calloc(1, sizeof(struct ast_param));
     param->is = is;
-    return param;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->param = param;
+    return node;
 }
 
-struct ast_stru *new_ast_stru(char is_complete, ast_tab_t *minitab){
+union ast_type *new_ast_stru(char is_complete, ast_tab_t *minitab){
     struct ast_stru *stru;
+    union ast_type *node;
 
     stru = calloc(1, sizeof(struct ast_stru));
     stru->is_complete = is_complete;
     stru->minitab = minitab;
-    return stru;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->stru = stru;
+    return node;
 }
 
-struct ast_unio *new_ast_unio(char is_complete, ast_tab_t *minitab){
+union ast_type *new_ast_unio(char is_complete, ast_tab_t *minitab){
     struct ast_unio *unio;
+    union ast_type *node;
 
     unio = calloc(1, sizeof(struct ast_unio));
     unio->is_complete = is_complete;
     unio->minitab = minitab;
-    return unio;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->unio = unio;
+    return node;
 }
 
-struct ast_enu *new_ast_enu(ast_tab_t *minitab){
+union ast_type *new_ast_enu(ast_tab_t *minitab){
     struct ast_enu *enu;
+    union ast_type *node;
  
     enu = calloc(1, sizeof(struct ast_enu));
     enu->minitab = minitab;
-    return enu;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->enu = enu;
+    return node;
 }
 
-struct ast_label *new_ast_label(char is_complete){
+union ast_type *new_ast_label(char is_complete){
     struct ast_label *label;
+    union ast_type *node;
  
     label = calloc(1, sizeof(struct ast_label));
     label->is_complete = is_complete;
-    return label;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->label = label;
+    return node;
 }
 
 ast_data_t *new_ast_data(int size, char data_type, char qual, union ast_type *node){
@@ -349,7 +377,7 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
                 break;
         }
     }
-    
+
     enter(tab, next, replace_dup);
     return 0;
 }

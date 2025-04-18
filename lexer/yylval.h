@@ -35,7 +35,8 @@ typedef struct {
 // } YYSTYPE;
 
 // extern YYSTYPE yylval;
-extern char *filename;
-extern int line;
+// extern YYLTYPE yylloc;
+// extern char *filename;
+// extern int line;
 
 #endif // YYLVAL_H

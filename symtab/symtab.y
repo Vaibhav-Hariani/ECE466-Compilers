@@ -62,12 +62,23 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
     #include "parse_output.h"
     #include "symtab_output.h"
     void yyerror(const char * s);
+
+	#define YYLTYPE YYLTYPE
+	typedef struct YYLTYPE {
+		int line;
+		char *filename;
+	} YYLTYPE;
+
+	sym_tab_t *scope_tab;
 }
 
+%define api.location.type {YYLTYPE}
+%locations
 
+%nterm <c> stgclass_spec qual_spec
 %nterm <node> prog term_expr expr binop_expr ternop_expr unop_expr assign_expr
-%nterm <data> type_spec 
-%nterm <sym> declaration_spec
+%nterm <data> type_spec func_spec enum_type_spec float_type_spec int_type_spec struct_type_spec union_type_spec
+%nterm <sym> declaration_spec init_declarator_list 
 %nterm <tab>
 %nterm <scal>
 %nterm <var>
@@ -103,32 +114,32 @@ declaration:
 // declaration specifiers
 
 declaration_spec:
-	stgclass_spec
-|	type_spec
-|	qual_spec
-|	func_spec
-|	stgclass_spec declaration_spec
+	stgclass_spec	{$$ = new_ast_sym(NULL, $1, NULL, @1.filename, @1.line);}
+|	type_spec	{$$ = new_ast_sym(NULL, 0, $1, @1.filename, @1.line);}
+|	qual_spec	{$$ = new_ast_sym(NULL, 0, new_ast_data(0, DATA_NONE, $1, NULL), @1.filename, @1.line);}
+|	func_spec	{$$ = new_ast_sym(NULL, 0, new_ast_data(0, DATA_FUNC, QUAL_NONE, new_ast_func(0, 1, NULL, NULL)), @1.filename, @1.line);}
+|	stgclass_spec declaration_spec	{$$.}
 |	qual_spec declaration_spec
 |	func_spec declaration_spec
 |	type_spec declaration_spec
 ;
 
 stgclass_spec:
-	EXTERN
-|	STATIC
-|	AUTO
-|	REGISTER
-|	TYPEDEF
+	EXTERN	{$$ = (char) STG_EXTERN_EXP;}
+|	STATIC	{$$ = (char) STG_EXTERN_EXP;}
+|	AUTO	{$$ = (char) STG_EXTERN_EXP;}
+|	REGISTER	{$$ = (char) STG_EXTERN_EXP;}
+|	TYPEDEF	{$$ = (char) STG_TYPEDEF;}
 ;
 
 qual_spec:
-|	CONST
-|	VOLATILE
-|	RESTRICT
+|	CONST	{$$ = (char) QUAL_CONST;}
+|	VOLATILE	{$$ = (char) QUAL_VOLATILE;}
+|	RESTRICT	{$$ = (char) QUAL_RESTRICT;}
 ;
 
 func_spec:
-	INLINE
+	INLINE	{$$ = /*func type with is_inline = 1*/}
 ;
 
 type_spec:
@@ -395,7 +406,7 @@ int main(int argc, char** argv){
         yyin = file;
     }
     yyparse();
-        if(yyin != stdin) {
+    if(yyin != stdin) {
         fclose(file);    
     }
 
