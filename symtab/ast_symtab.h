@@ -18,15 +18,22 @@ enum sym_type {
     SYM_FUNC,
     SYM_ENU_C,
     SYM_PARAM,
-    /*tags*/
+    /*tag*/
     SYM_STRU_T,
     SYM_UNIO_T,
     SYM_ENU_T,
-    /*members*/
+    /*member*/
     SYM_STRU_M,
     SYM_UNIO_M,
     /*label*/
     SYM_LABEL
+};
+
+enum ns_type {
+    NS_MISC = 0,
+    NS_TAG,
+    NS_MEMB,
+    NS_LABEL
 };
 
 enum type_type {
@@ -48,7 +55,8 @@ enum stg_type {
     STG_STATIC,
     STG_REGISTER,
     STG_AUTO_LOC,
-    STG_AUTO_PAR
+    STG_AUTO_PAR,
+    STG_NA
 };
 
 // get/set with bitwise operations
@@ -93,8 +101,9 @@ struct ast_tab {
     char scope_type;
 
     ast_sym_t *misc;
-    ast_sym_t *tags;
-    ast_sym_t *labels;
+    ast_sym_t *tag;
+    ast_sym_t *memb;
+    ast_sym_t *label;
 };
 
 
@@ -105,7 +114,7 @@ struct ast_tab {
 // number at which the symbol was defined
 // and the type info.
 typedef struct ast_sym {
-    ast_tab_t *table;
+    ast_tab_t *tab;
     ast_sym_t *next;
     char *filename;
     int line;
@@ -113,6 +122,7 @@ typedef struct ast_sym {
     char *name;
     char stg_type;
     char sym_type;
+    int offset;
     ast_type_t *type;
 } ast_sym_t;
 
@@ -142,48 +152,22 @@ struct ast_param {
 // but not necessarily so per standard.
 struct ast_func {
     ast_type_t *ret;
-    struct ast_proto {
-        char *name;
-        ast_type_t *param;
-        struct ast_proto *next;
-    } *param_list;
+    ast_tab_t *params;
 };
 
-
-// note: nested structs/unions have same
-// scope as parent struct/union maybe?
 struct ast_stru {
     char is_complete;
-    struct ast_smembs {
-        struct ast_smembs *next;
-
-        char *name;
-        int offset;
-        ast_type_t *type;
-        // bitfields not implemented
-    } *smembs;
+    ast_tab_t *minitab;
 };
 
-// note: nested structs/unions have same
-// scope as parent struct/union maybe?
 struct ast_unio {
     char is_complete;
-    struct ast_umembs {
-        struct ast_umembs *next;
-        
-        char *name;
-        ast_type_t *type;
-    } *umembs;
+    ast_tab_t *minitab;
 };
 
 // enums may not get implemented
 struct ast_enu {
-    struct ast_enumcs {
-        struct ast_enumcs *next;
-        
-        char *name;
-        int value;
-    } *enumcs;
+    ast_tab_t *minitab;
 };
 
 // note: scope is always function
@@ -196,10 +180,10 @@ struct ast_var *new_ast_var(ast_type_t *is);
 struct ast_ptr *new_ast_ptr(ast_type_t *to);
 struct ast_ary *new_ast_ary(int size, ast_type_t *elem);
 struct ast_param *new_ast_param(ast_type_t *is);
-struct ast_func *new_ast_func(ast_type_t *ret, struct ast_proto *param_list);
-struct ast_stru *new_ast_stru(char is_complete, struct ast_smembs *smembs);
-struct ast_unio *new_ast_unio(char is_complete, struct ast_umembs *umembs);
-struct ast_enu *new_ast_enu(struct ast_enumcs *enumcs);
+struct ast_func *new_ast_func(ast_type_t *ret, ast_tab_t *params);
+struct ast_stru *new_ast_stru(char is_complete, ast_tab_t *minitab);
+struct ast_unio *new_ast_unio(char is_complete, ast_tab_t *minitab);
+struct ast_enu *new_ast_enu(ast_tab_t *minitab);
 struct ast_label *new_ast_label(int is_complete);
 
 // Creates ast_type_t object with specified type, qualifiers
@@ -210,7 +194,9 @@ ast_type_t *new_ast_type(char type, char qual, void *node);
 int del_ast_type(ast_type_t *type);
 
 // Creates ast_sym_t object with the specified name, storage
-// class and type and returns its address.
+// class and type and returns its address. Assumes name,
+// type and filename are dynamically allocated and uses
+// their same addresses.
 ast_sym_t *new_ast_sym(char *name, char stg_type, ast_type_t *type,
     char *filename, int line);
 
@@ -225,10 +211,9 @@ ast_sym_t *del_ast_sym(ast_sym_t *sym);
 ast_tab_t *new_ast_tab(ast_tab_t *parent, char scope_type);
 
 // Destroys symbol table pointed to by tab and all storage
-// it consumes. Changes the current scope/the symbol
-// table pointed to by curr to the enclosing scope/symbol
-// table.
-int del_ast_tab(ast_tab_t *tab, ast_tab_t *curr);
+// it consumes. Returns a pointer to the symbol table for
+// the immediately enclosing scope.
+ast_tab_t *del_ast_tab(ast_tab_t *tab);
 
 // Searches for symbol called name in the appropriate
 // namespace for sym_type in symbol table pointed to by
@@ -241,7 +226,8 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type);
 // table pointed to by tab. If replace_dup is 0, an error
 // occurs if a symbol with the same name and namespace
 // exists; otherwise, such a symbol is replaced. Returns 0
-// on entry, 1 on replacement, 2 on error.
+// on entry, 1 on replacement, 2 on error. On replacement,
+// sym will change to point to the symbol in the tab.
 int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
 
 #endif // AST_SYMTAB_H
