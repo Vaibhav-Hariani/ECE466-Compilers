@@ -21,7 +21,7 @@ int print_memb_decl(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_na
 int print_sym_decl(ast_sym_t *sym, int num_tabs);
 
 // Prints definition, scope and data type infortmation of
-// structs/unions/enums.
+// structs/unions.
 int print_obj_def(ast_sym_t *sym, int num_tabs);
 
 #endif // SYMTAB_OUTPUT_H

@@ -186,7 +186,6 @@ struct ast_unio {
     ast_tab_t *minitab;
 };
 
-// enums may not get implemented
 struct ast_enu {
     ast_sym_t *tag;
 };

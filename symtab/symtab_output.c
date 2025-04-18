@@ -165,42 +165,42 @@ int print_data(ast_data_t *data, int num_tabs) {
             print_data(data->node->param->is, num_tabs = 1);
             break;
         case DATA_STRU:
-            if (data->node->stru->sym->name != NULL) {
-                printf("struct %s ", data->node->stru->sym->name);
+            if (data->node->stru->tag->name != NULL) {
+                printf("struct %s ", data->node->stru->tag->name);
             } else {
                 printf("anonymous struct ");
             }
             if (data->node->stru->is_complete) {
                 printf("(defined at <%s>:%d)\n",
-                    data->node->stru->sym->filename,
-                    data->node->stru->sym->line);
+                    data->node->stru->tag->filename,
+                    data->node->stru->tag->line);
             } else {
                 printf("(incomplete)\n");
             }
             break;
         case DATA_UNIO:
-            if (data->node->unio->sym->name != NULL) {
-                printf("union %s ", data->node->unio->sym->name);
+            if (data->node->unio->tag->name != NULL) {
+                printf("union %s ", data->node->unio->tag->name);
             } else {
                 printf("anonymous union ");
             }
             if (data->node->unio->is_complete) {
                 printf("(defined at <%s>:%d)\n",
-                    data->node->unio->sym->filename,
-                    data->node->unio->sym->line);
+                    data->node->unio->tag->filename,
+                    data->node->unio->tag->line);
             } else {
                 printf("(incomplete)\n");
             }
             break;
         case DATA_ENU:
-            if (data->node->enu->sym->name != NULL) {
-                printf("enum %s ", data->node->enu->sym->name);
+            if (data->node->enu->tag->name != NULL) {
+                printf("enum %s ", data->node->enu->tag->name);
             } else {
                 printf("anonymous enum ");
             }
             printf("(defined at <%s>:%d)\n",
-                    data->node->unio->sym->filename,
-                    data->node->unio->sym->line);
+                    data->node->unio->tag->filename,
+                    data->node->unio->tag->line);
             break;
         case DATA_LABEL:
             printf("label");
@@ -257,10 +257,6 @@ int print_obj_def(ast_sym_t *sym, int num_tabs) {
         case SYM_UNIO_T:
             strdup(data_name, "union");
             memb = sym->data->node->unio->minitab->memb;
-            break;
-        case SYM_ENU_T:
-            strdup(data_name, "enum");
-            memb = sym->data->node->enu->minitab->memb;
             break;
     }
     
