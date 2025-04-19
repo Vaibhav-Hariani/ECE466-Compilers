@@ -317,78 +317,96 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type) {
     return NULL;
 }
 
-ast_sym_t *enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
+int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
     ast_sym_t *old, *next;
-    int namespace;
+    ast_tab_t *curr_tab;
+    int fails;
 
-    next = sym->next;
-    sym->next = NULL;
-    old = lookup(tab, sym->name, sym->sym_type);
-    if (old != NULL && old->tab == tab) {
-        if (replace_dup) {
-            // external refdefinitions? see h&s 4.2.5
+    fails = 0;
+    while (sym != NULL) {
+        curr_tab = tab;
+        next = sym->next;
+        sym->next = NULL;
+        old = lookup(tab, sym->name, sym->sym_type);
+        if (old != NULL && old->tab == tab) {
+            if (replace_dup) {
+                // external refdefinitions? see h&s 4.2.5
 
-            // potentially have to check if types are compatible.
-            // if compatible, we might have to construct
-            // a composite type, which we can do in old by combing
-            // through old and sym and comparing type attributes.
-            // we do this in old because there's already some symbol
-            // in the table pointing to old as the next symbol.
-
-            // once all of that is done, assuming no error,
-            // we have redeclared old
-            free(old->filename);
-            old->filename = strdup(sym->filename);
-            old->line = sym->line;
-            del_ast_sym(sym);
-            return old;
+                // potentially have to check if types are compatible.
+                // if compatible, we might have to construct
+                // a composite type, which we can do in old by combing
+                // through old and sym and comparing type attributes.
+                // we do this in old because there's already some symbol
+                // in the table pointing to old as the next symbol.
+                
+                // if (/*SOME ERROR*/) {
+                //     fails++;
+                // } else {
+                free(old->filename);
+                old->filename = strdup(sym->filename);
+                old->line = sym->line;
+                del_ast_sym(sym);
+                // }
+            } else {
+                // ERROR symbol already defined, cant replace
+                del_ast_sym(sym);
+                fails++;
+            }
         } else {
-            // ERROR symbol already defined, cant replace
-            del_ast_sym(sym);
-            return NULL;
-        }
-    } else {
-        namespace = NS_MISC;
-        if (sym->sym_type == SYM_LABEL){
-            namespace = NS_LABEL;
-        } else if (sym->sym_type >= SYM_STRU_M) {
-            namespace = NS_MEMB;
-        } else if (sym->sym_type >= SYM_STRU_T) {
-            namespace = NS_TAG;
-        }
+            switch (sym->sym_type) {
+                /*misc*/
+                case SYM_VAR:
+                case SYM_TYPEDEF:
+                case SYM_FUNC:
+                case SYM_ENU_C:
+                case SYM_PARAM:
+                    sym->next = curr_tab->misc;
+                    curr_tab->misc = sym;
+                    break;
 
-        switch (namespace) {
-            case NS_MISC:
-                sym->next = tab->misc;
-                tab->misc = sym;
-                break;
-            case NS_TAG:
-                sym->next = tab->tag;
-                tab->tag = sym;
-                break;
-            case NS_MEMB:
-                sym->next = tab->memb;
-                tab->memb = sym;
-                break;
-            case NS_LABEL:
-                sym->next = tab->label;
-                tab->label = sym;
-                break;
+                /*tag*/
+                case SYM_STRU_T:
+                case SYM_UNIO_T:
+                case SYM_ENU_T:
+                    sym->next = curr_tab->tag;
+                    curr_tab->tag = sym;
+                    break;
+
+                /*member*/
+                case SYM_STRU_M:
+                case SYM_UNIO_M:
+                    if (sym->sym_type == SYM_STRU_M) {
+                        /*struct/union def within struct/union takes enclosing scope*/
+                        while (curr_tab->scope_type == SCOPE_STRU
+                            || curr_tab->scope_type == SCOPE_UNIO) {
+                            curr_tab = tab->parent;
+                        }
+                    }
+                    fails += enter(curr_tab, sym, replace_dup);
+                    break;
+
+                /*label*/
+                case SYM_LABEL:
+                    sym->next = curr_tab->label;
+                    curr_tab->label = sym;
+                    break;
+            }
         }
+        sym = next;
     }
 
-    enter(tab, next, replace_dup);
-    return sym;
+    return 0;
 }
+    
 
-int get_align(ast_sym_t *sym) {
+int get_align(ast_sym_t *memb, ast_sym_t *sym) {
     int align, temp;
 
     align = 1;
-    switch(sym->data->data_type) {
+    switch(memb->data->data_type) {
         // bitfields not implemented
         case DATA_SCAL:
-            switch (sym->data->node->scal->scal_type) {
+            switch (memb->data->node->scal->scal_type) {
                 case SCAL_SHORT:
                     align = __alignof__ (short);
                     break;
@@ -417,9 +435,14 @@ int get_align(ast_sym_t *sym) {
         case DATA_PTR:
             align = __alignof__ (void *);
             break;
-        case DATA_ARY: case DATA_STRU: case DATA_UNIO:
+        case DATA_STRU: case DATA_UNIO:
+            if (!strcmp(memb->name, sym->name)) {
+                /*ERROR cannot be own type*/
+            }
+
+        case DATA_ARY: // DATA_STRU and DATA_UNIO fall through
             // guess: sizeof type rounded up to nearest power of 2
-            temp = sym->data->size;
+            temp = memb->data->size;
             while (align < temp) {
                 align *= 2;
             }
@@ -435,15 +458,15 @@ int get_align(ast_sym_t *sym) {
     return align;
 }
 
-int struct_size(ast_tab_t *minitab) {
+int struct_fix(ast_data_t *data) {
     int size, align, max_align;
     ast_sym_t *curr;
 
     size = 0;
     max_align = 0;
-    curr = minitab->memb;
+    curr = data->node->stru->minitab->memb;
     while (curr != NULL) {
-        align = get_align(curr);
+        align = get_align(curr, data->node->stru->tag);
 
         if (align >= max_align) {
             max_align = align;
@@ -455,22 +478,24 @@ int struct_size(ast_tab_t *minitab) {
     }
 
     // pad struct so members in struct arrays remain aligned
-    return size + (max_align - ((size-1) % max_align + 1));
+    data->size = size + (max_align - ((size-1) % max_align + 1));
+    return 0;
 }
 
-int union_size(ast_tab_t *minitab) {
+int union_fix(ast_data_t *data) {
     int size, align;
     ast_sym_t *curr;
 
     size = 0;
-    curr = minitab->memb;
+    curr = data->node->unio->minitab->memb;
     while (curr != NULL) {
-        align = get_align(curr);
+        align = get_align(curr, data->node->unio->tag);
 
         if (align >= size) {
             size = align;
         }
     }
 
-    return size;
+    data->size = size;
+    return 0;
 }

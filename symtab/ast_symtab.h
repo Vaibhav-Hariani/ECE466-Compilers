@@ -246,24 +246,28 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type);
 
 // Attempts to enter the symbol list pointed to by sym and
 // the chain of next ast_sym_t *s into the table pointed to
-// by tab. If replace_dup is 0, an error occurs if a symbol
-// with the same name and namespace exists; otherwise, such a
-// symbol is replaced.
-// If replace_dup is 0, returns sym on success, NULL on fail.
-// If replace_dup is 1, returns either sym or the address
-// into which *sym was merged on success, NULL on fail. 
-ast_sym_t *enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
+// by tab. If sym points to a struct and tab is in
+// struct/union scope, sym is entered into the enclosing
+// non-struct/union scope. If replace_dup is 0, an error
+// occurs if a symbol with the same name and namespace
+// exists; otherwise, such a symbol is replaced.
+// Returns the number of symbols not entered into a table
+// (0 if all successfully entered).
+int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
 
-// Returns the size of a struct data type whose members
-// are stored in minitab. Also sets offsets for all members
-// and pads the structure such that all members would meet
-// their respective alignment requirements in a struct array.
-int struct_size(ast_tab_t *minitab);
+// Sets the size of a struct data type whose members are
+// stored in the struct's symbol table. Pads the struct such
+// that all members would meet their respective alignment
+// requirements in a struct array. Handles pointers to
+// structs of its own type, nested definitions. Sets offsets
+// for all members.
+int struct_fix(ast_data_t *data);
 
-// Returns the size of a union data type whose members
-// are stored in minitab. Also pads the union such that all
-// members would meet their respective alignment requirements
-// in a union array.
-int union_size(ast_tab_t *minitab);
+// Sets the size of a union data type whose members are
+// stored in the union's symbol table. Pads the union such
+// that all members would meet their respective alignment
+// requirements in a union array. Handles pointers to
+// unions of its own type, nested definitions.
+int union_fix(ast_data_t *data);
 
 #endif // AST_SYMTAB_H

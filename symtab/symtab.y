@@ -84,6 +84,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <data> float_type_spec int_type_spec
 %nterm <data> signed_type_spec unsigned_type_spec char_type_spec
 %nterm <sym> declaration declaration_spec init_declarator_list
+%nterm <sym> component_declaration
 %nterm <tab> field_list
 %nterm enum_def_list;
 %token <i> IDENT;
@@ -209,7 +210,7 @@ enum_type_def:
 		$$->next = $3;
 	}
 |	ENUM IDENT '{' enum_def_list comma_opt '}' {
-		ast_sym_t *tag = new_ast_sym($2, STG_NONE, SYM_ENUM_T,
+		ast_sym_t *tag = new_ast_sym($2, STG_NA, SYM_ENUM_T,
 				new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE, NULL));
 		tag->data->node->enu->tag = tag; /*this is ridiculous*/
 		$$ = tag->data;
@@ -229,11 +230,11 @@ enum_type_ref:
 
 enum_def_list:
 	enum_constant_def	{
-		$$ = new_ast_sym($1, STGCLASS_NA, SYM_ENUM_C, NULL,
+		$$ = new_ast_sym($1, STG_NA, SYM_ENUM_C, NULL,
 			@1.filename, @1.line);
 	}
 |	enum_def_list ',' enum_constant_def	{
-		$$ = new_ast_sym($3, STGCLASS_NA, SYM_ENUM_C, NULL,
+		$$ = new_ast_sym($3, STG_NA, SYM_ENUM_C, NULL,
 			@3.filename, @3.line);
 		$$->next = $1;
 	}
@@ -300,9 +301,16 @@ struct_type_spec:
 
 struct_type_def:
 	STRUCT '{' field_list '}' {
-		$$ = new_ast_data(NULL, DATA_STRU, QUAL_NONE,
-			new_ast_stru(NULL));
-		$$->next = $3;
+		$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
+			new_ast_stru(0,
+				new_ast_sym(NULL, STG_NA, SYM_STRU_T, NULL,
+					@1.filename, @1.line),
+				$$->node->stru->minitab));
+		
+		$$->node->stru->tag->data = $$;
+		struct_fix($$);
+		$$->node->stru->is_complete = 1;
+
 	}
 |	STRUCT IDENT '{' field_list '}'
 ;
@@ -310,7 +318,14 @@ struct_type_def:
 struct_type_ref:
 	STRUCT IDENT	{
 		$$ = lookup(scope_tab, $2, SYM_STRU_T);
-		/*may be a forward reference so no error here*/
+		if ($$ == NULL) {
+			/*install incomplete tag in symbol table*/
+			$$ = new_ast_sym($2, STG_NONE, SYM_STRU_T,
+				new_ast_data(0, DATA_STRU, QUAL_NONE,
+					new_ast_stru(0, NULL, NULL)),
+				@1.filename, @1.line);
+			$$->data->node->stru->tag->$$;
+		}
 	}
 ;
 
@@ -328,8 +343,14 @@ union_type_ref:
 	UNION IDENT
 ;
 field_list:
-	component_declaration
-|	field_list component_declaration
+	component_declaration {
+		$$ = new_ast_tab(scope_tab, SCOPE_STRU, @1.filename, @1.line);
+		enter($$, $1, 0);
+	}
+|	field_list component_declaration {
+		enter($1, $2, 0);
+		$$ = $1;
+	}
 ;
 
 component_declaration:
