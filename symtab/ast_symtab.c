@@ -275,28 +275,30 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type) {
     ast_sym_t *sym;
     ast_tab_t *curr;
 
-    namespace = NS_MISC;
-    if (sym_type == SYM_LABEL){
-        namespace = NS_LABEL;
-    } else if (sym_type >= SYM_STRU_M) {
-        namespace = NS_MEMB;
-    } else if (sym_type >= SYM_STRU_T) {
-        namespace = NS_TAG;
-    }
-
     curr = tab;
     while (curr != NULL) {
-        switch (namespace) {
-            case NS_MISC:
+        switch (sym_type) {
+            /*misc*/
+            case SYM_VAR:
+            case SYM_TYPEDEF:
+            case SYM_FUNC:
+            case SYM_ENU_C:
+            case SYM_PARAM:
                 sym = curr->misc;
                 break;
-            case NS_TAG:
+            /*tag*/
+            case SYM_STRU_T:
+            case SYM_UNIO_T:
+            case SYM_ENU_T:
                 sym = curr->tag;
                 break;
-            case NS_MEMB:
+            /*member*/
+            case SYM_STRU_M:
+            case SYM_UNIO_M:
                 sym = curr->memb;
                 break;
-            case NS_LABEL:
+            /*label*/
+            case SYM_LABEL:
                 // labels only in function scope
                 if (curr->scope_type != SCOPE_FUNC) {
                     curr = curr->parent;
@@ -360,6 +362,7 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
                 case SYM_FUNC:
                 case SYM_ENU_C:
                 case SYM_PARAM:
+                    sym->tab = curr_tab;
                     sym->next = curr_tab->misc;
                     curr_tab->misc = sym;
                     break;
@@ -368,6 +371,7 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
                 case SYM_STRU_T:
                 case SYM_UNIO_T:
                 case SYM_ENU_T:
+                    sym->tab = curr_tab;
                     sym->next = curr_tab->tag;
                     curr_tab->tag = sym;
                     break;
@@ -387,6 +391,7 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
 
                 /*label*/
                 case SYM_LABEL:
+                    sym->tab = curr_tab;
                     sym->next = curr_tab->label;
                     curr_tab->label = sym;
                     break;

@@ -305,14 +305,34 @@ struct_type_def:
 			new_ast_stru(0,
 				new_ast_sym(NULL, STG_NA, SYM_STRU_T, NULL,
 					@1.filename, @1.line),
-				$$->node->stru->minitab));
+				$3));
 		
 		$$->node->stru->tag->data = $$;
 		struct_fix($$);
 		$$->node->stru->is_complete = 1;
-
 	}
-|	STRUCT IDENT '{' field_list '}'
+|	STRUCT IDENT '{' field_list '}' {
+		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
+		if (temp != NULL && temp->tab == scope_tab) {
+			if (temp->data->stru->is_complete) {
+				/*ERROR redeclaration not permitted*/
+			} else {
+				$$ = temp->data;
+				$$->data->node->stru->minitab = $4;
+			}
+		} else {
+		$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
+			new_ast_stru(0,
+				new_ast_sym($2, STG_NA, SYM_STRU_T, NULL,
+					@1.filename, @1.line),
+				$4));
+			$$->node->stru->tag->data = $$;
+			enter(scope_tab, $$->node->stru->tag, 0);
+		}
+		
+		struct_fix($$);
+		$$->node->stru->is_complete = 1;
+	}
 ;
 
 struct_type_ref:
