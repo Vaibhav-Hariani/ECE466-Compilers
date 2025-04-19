@@ -71,11 +71,8 @@ int print_scope(int scope_type, char *filename, int line) {
         case SCOPE_PROTO:
             printf("prototype ");
             break;
-        case SCOPE_STRU:
-            printf("struct ");
-            break;
-        case SCOPE_UNIO:
-            printf("union ");
+        case SCOPE_STRUNIO:
+            printf("struct/union ");
             break;
         case SCOPE_ENU:
             printf("enum ");

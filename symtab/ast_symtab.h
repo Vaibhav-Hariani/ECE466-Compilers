@@ -9,8 +9,7 @@ enum scope_type {
     SCOPE_FUNC,
     SCOPE_BLOCK,
     SCOPE_PROTO,
-    SCOPE_STRU,
-    SCOPE_UNIO,
+    SCOPE_STRUNIO,
     SCOPE_ENU
 };
 
@@ -269,5 +268,11 @@ int struct_fix(ast_data_t *data);
 // requirements in a union array. Handles pointers to
 // unions of its own type, nested definitions.
 int union_fix(ast_data_t *data);
+
+// may need to be implemented differently altogether.
+// Returns a pointer to the merged type. Guarantees the
+// data pointed to by spec is unchanged (it stays entirely
+// separate from head and tail).
+ast_data_t *merge_types(ast_data_t *spec, ast_data_t *head, ast_data_t *tail);
 
 #endif // AST_SYMTAB_H

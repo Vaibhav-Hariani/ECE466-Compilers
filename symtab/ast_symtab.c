@@ -381,8 +381,7 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
                 case SYM_UNIO_M:
                     if (sym->sym_type == SYM_STRU_M) {
                         /*struct/union def within struct/union takes enclosing scope*/
-                        while (curr_tab->scope_type == SCOPE_STRU
-                            || curr_tab->scope_type == SCOPE_UNIO) {
+                        while (curr_tab->scope_type == SCOPE_STRUNIO) {
                             curr_tab = tab->parent;
                         }
                     }

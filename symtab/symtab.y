@@ -77,14 +77,17 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 
 %nterm <i> enum_constant_def ident_opt
 %nterm <c> stgclass_spec qual_spec
-%nterm <data> func_spec type_spec
+%nterm <data> type_spec
 %nterm <data> enum_type_spec enum_type_def enum_type_ref
 %nterm <data> struct_type_spec struct_type_def struct_type_ref
 %nterm <data> union_type_spec union_type_def union_type_ref
 %nterm <data> float_type_spec int_type_spec
 %nterm <data> signed_type_spec unsigned_type_spec char_type_spec
+%nterm <data> type_name abstract_declarator
 %nterm <sym> declaration declaration_spec init_declarator_list
+%nterm <sym> declarator declarator_list 
 %nterm <sym> component_declaration
+%nterm <sym> component_declarator component_declarator_list
 %nterm <tab> field_list
 %nterm enum_def_list;
 %token <i> IDENT;
@@ -185,7 +188,7 @@ qual_spec:
 ;
 
 func_spec:
-	INLINE	{$$ = /*func type with is_inline = 1*/}
+	INLINE
 ;
 
 type_spec:
@@ -210,7 +213,7 @@ enum_type_def:
 		$$->next = $3;
 	}
 |	ENUM IDENT '{' enum_def_list comma_opt '}' {
-		ast_sym_t *tag = new_ast_sym($2, STG_NA, SYM_ENUM_T,
+		ast_sym_t *tag = new_ast_sym($2, STG_NONE, SYM_ENUM_T,
 				new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE, NULL));
 		tag->data->node->enu->tag = tag; /*this is ridiculous*/
 		$$ = tag->data;
@@ -230,11 +233,11 @@ enum_type_ref:
 
 enum_def_list:
 	enum_constant_def	{
-		$$ = new_ast_sym($1, STG_NA, SYM_ENUM_C, NULL,
+		$$ = new_ast_sym($1, STG_NONE, SYM_ENUM_C, NULL,
 			@1.filename, @1.line);
 	}
 |	enum_def_list ',' enum_constant_def	{
-		$$ = new_ast_sym($3, STG_NA, SYM_ENUM_C, NULL,
+		$$ = new_ast_sym($3, STG_NONE, SYM_ENUM_C, NULL,
 			@3.filename, @3.line);
 		$$->next = $1;
 	}
@@ -303,7 +306,7 @@ struct_type_def:
 	STRUCT '{' field_list '}' {
 		$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
 			new_ast_stru(0,
-				new_ast_sym(NULL, STG_NA, SYM_STRU_T, NULL,
+				new_ast_sym(NULL, STG_NONE, SYM_STRU_T, NULL,
 					@1.filename, @1.line),
 				$3));
 		
@@ -323,7 +326,7 @@ struct_type_def:
 		} else {
 		$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
 			new_ast_stru(0,
-				new_ast_sym($2, STG_NA, SYM_STRU_T, NULL,
+				new_ast_sym($2, STG_NONE, SYM_STRU_T, NULL,
 					@1.filename, @1.line),
 				$4));
 			$$->node->stru->tag->data = $$;
@@ -345,26 +348,70 @@ struct_type_ref:
 					new_ast_stru(0, NULL, NULL)),
 				@1.filename, @1.line);
 			$$->data->node->stru->tag->$$;
+			enter(scope_tab, $$, 0);
 		}
 	}
 ;
 
 union_type_spec:
-	union_type_def
-|	union_type_ref
+	union_type_def	{$$ = $1;}
+|	union_type_ref	{$$ = $1;}
 ;
 
 union_type_def:
-	UNION '{' field_list '}'
-|	UNION IDENT '{' field_list '}'
+	UNION '{' field_list '}' {
+		$$ = new_ast_data(0, DATA_UNIO, QUAL_NONE,
+			new_ast_unio(0,
+				new_ast_sym(NULL, STG_NONE, SYM_UNIO_T, NULL,
+					@1.filename, @1.line),
+				$3));
+		
+		$$->node->unio->tag->data = $$;
+		unio_fix($$);
+		$$->node->unio->is_complete = 1;
+	}
+|	UNION IDENT '{' field_list '}'  {
+		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
+		if (temp != NULL && temp->tab == scope_tab) {
+			if (temp->data->unio->is_complete) {
+				/*ERROR redeclaration not permitted*/
+			} else {
+				$$ = temp->data;
+				$$->data->node->unio->minitab = $4;
+			}
+		} else {
+		$$ = new_ast_data(0, DATA_UNIO, QUAL_NONE,
+			new_ast_unio(0,
+				new_ast_sym($2, STG_NONE, SYM_UNIO_T, NULL,
+					@1.filename, @1.line),
+				$4));
+			$$->node->unio->tag->data = $$;
+			enter(scope_tab, $$->node->unio->tag, 0);
+		}
+		
+		unio_fix($$);
+		$$->node->unio->is_complete = 1;
+	}
 ;
 
 union_type_ref:
-	UNION IDENT
+	UNION IDENT	{
+		$$ = lookup(scope_tab, $2, SYM_UNIO_T);
+		if ($$ == NULL) {
+			/*install incomplete tag in symbol table*/
+			$$ = new_ast_sym($2, STG_NONE, SYM_UNIO_T,
+				new_ast_data(0, DATA_UNIO, QUAL_NONE,
+					new_ast_unio(0, NULL, NULL)),
+				@1.filename, @1.line);
+			$$->data->node->unio->tag->$$;
+			enter(scope_tab, $$, 0);
+		}
+	}
 ;
+
 field_list:
 	component_declaration {
-		$$ = new_ast_tab(scope_tab, SCOPE_STRU, @1.filename, @1.line);
+		$$ = new_ast_tab(scope_tab, SCOPE_STRUNIO, @1.filename, @1.line);
 		enter($$, $1, 0);
 	}
 |	field_list component_declaration {
@@ -374,24 +421,42 @@ field_list:
 ;
 
 component_declaration:
-	type_spec component_declarator_list ';'
+	type_spec component_declarator_list ';' {
+		ast_sym_t *temp = $2;
+		while (temp != NULL) {
+			temp->data = merge_types($1, temp->data, NULL);
+			temp = temp->next;
+		}
+		$$ = $2;
+	}
 ;
 
 component_declarator_list:
-	component_declarator
-|	component_declarator_list ',' component_declarator
+	component_declarator {$$ = $1;}
+|	component_declarator_list ',' component_declarator {
+		$$ = $1;
+		$$->next = $2;
+	}
 ;
 
 // bit field width should be constant expression, not NUM
 component_declarator:
-	declarator
-|	':' NUM
-|	declarator ':' NUM
+	declarator {$$ = $1;}
+|	':' NUM {/*bit fields not implemented*/}
+|	declarator ':' NUM {$$ = $1; /*bit fields not implemented*/}
 ;
 
+// for casts and sizeof
 type_name:
-	declaration_spec
-|	declaration_spec abstract_declarator
+	declaration_spec {
+		$$ = $1->data;
+		free($1); // not entering symbol table
+	}
+|	declaration_spec abstract_declarator {
+		$$ = $1->data;
+		free($1); // not entering symbol table
+		merge_types($$, $2);
+	}
 ;
 
 // declarators
