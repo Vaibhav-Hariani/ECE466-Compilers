@@ -380,3 +380,97 @@ ast_sym_t *enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
     enter(tab, next, replace_dup);
     return sym;
 }
+
+int get_align(ast_sym_t *sym) {
+    int align, temp;
+
+    align = 1;
+    switch(sym->data->data_type) {
+        // bitfields not implemented
+        case DATA_SCAL:
+            switch (sym->data->node->scal->scal_type) {
+                case SCAL_SHORT:
+                    align = __alignof__ (short);
+                    break;
+                case SCAL_INT:
+                    align = __alignof__ (int);
+                    break;
+                case SCAL_LONG:
+                    align = __alignof__ (long);
+                    break;
+                case SCAL_LONGLONG:
+                    align = __alignof__ (long long);
+                    break;
+                case SCAL_FLOAT:
+                    align = __alignof__ (float);
+                    break;
+                case SCAL_DOUB:
+                    align = __alignof__ (double);
+                    break;
+                case SCAL_LONGDOUB:
+                    align = __alignof__ (long double);
+                    break;
+                case SCAL_CHAR:
+                    align = __alignof__ (char);
+                    break;
+            }
+        case DATA_PTR:
+            align = __alignof__ (void *);
+            break;
+        case DATA_ARY: case DATA_STRU: case DATA_UNIO:
+            // guess: sizeof type rounded up to nearest power of 2
+            temp = sym->data->size;
+            while (align < temp) {
+                align *= 2;
+            }
+            break;
+        case DATA_ENU:
+            align = __alignof__ (int);
+            break;
+        default:
+            /*ERROR type not permitted as struct member*/
+            break;
+    }
+
+    return align;
+}
+
+int struct_size(ast_tab_t *minitab) {
+    int size, align, max_align;
+    ast_sym_t *curr;
+
+    size = 0;
+    max_align = 0;
+    curr = minitab->memb;
+    while (curr != NULL) {
+        align = get_align(curr);
+
+        if (align >= max_align) {
+            max_align = align;
+        }
+
+        //             size + padding to reach alignment 
+        curr->offset = size += (align - ((size-1) % align + 1));
+        size = curr->offset + curr->data->size;
+    }
+
+    // pad struct so members in struct arrays remain aligned
+    return size + (max_align - ((size-1) % max_align + 1));
+}
+
+int union_size(ast_tab_t *minitab) {
+    int size, align;
+    ast_sym_t *curr;
+
+    size = 0;
+    curr = minitab->memb;
+    while (curr != NULL) {
+        align = get_align(curr);
+
+        if (align >= size) {
+            size = align;
+        }
+    }
+
+    return size;
+}

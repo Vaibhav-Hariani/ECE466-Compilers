@@ -63,7 +63,8 @@ enum scal_type {
     SCAL_DOUB,
     SCAL_LONGDOUB,
     SCAL_CHAR,
-    SCAL_VOID
+    SCAL_VOID,
+    SCAL_BOOL
 };
 
 enum stg_type {
@@ -252,5 +253,17 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type);
 // If replace_dup is 1, returns either sym or the address
 // into which *sym was merged on success, NULL on fail. 
 ast_sym_t *enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
+
+// Returns the size of a struct data type whose members
+// are stored in minitab. Also sets offsets for all members
+// and pads the structure such that all members would meet
+// their respective alignment requirements in a struct array.
+int struct_size(ast_tab_t *minitab);
+
+// Returns the size of a union data type whose members
+// are stored in minitab. Also pads the union such that all
+// members would meet their respective alignment requirements
+// in a union array.
+int union_size(ast_tab_t *minitab);
 
 #endif // AST_SYMTAB_H

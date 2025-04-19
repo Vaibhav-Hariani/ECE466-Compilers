@@ -75,22 +75,17 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %define api.location.type {YYLTYPE}
 %locations
 
-%nterm <i> enum_constant_def ident_opt;
-%nterm <c> stgclass_spec qual_spec;
-%nterm <node> prog term_expr expr binop_expr ternop_expr unop_expr assign_expr;
-%nterm <data> type_spec func_spec enum_type_spec enum_type_def enum_type_ref float_type_spec int_type_spec struct_type_spec union_type_spec;
-%nterm <sym> declaration_spec init_declarator_list enum_def_list;
-%nterm <tab>;
-%nterm <scal>;
-%nterm <var>;
-%nterm <ptr>;
-%nterm <ary>;
-%nterm <param>;
-%nterm <func>;
-%nterm <stru>;
-%nterm <unio>;
-%nterm <enu>;
-%nterm <label>;
+%nterm <i> enum_constant_def ident_opt
+%nterm <c> stgclass_spec qual_spec
+%nterm <data> func_spec type_spec
+%nterm <data> enum_type_spec enum_type_def enum_type_ref
+%nterm <data> struct_type_spec struct_type_def struct_type_ref
+%nterm <data> union_type_spec union_type_def union_type_ref
+%nterm <data> float_type_spec int_type_spec
+%nterm <data> signed_type_spec unsigned_type_spec char_type_spec
+%nterm <sym> declaration declaration_spec init_declarator_list
+%nterm <tab> field_list
+%nterm enum_def_list;
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
@@ -109,7 +104,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 
 declaration:
 	declaration_spec ';'
-|	declaration_spec init_declatator_list ';'
+|	declaration_spec init_declarator_list ';'
 ;
 
 // declaration specifiers
@@ -171,7 +166,7 @@ declaration_spec:
 			$2->data = $1;
 		}
 		$$ = $2;
-	}	
+	}
 ;
 
 stgclass_spec:
@@ -199,7 +194,7 @@ type_spec:
 |	struct_type_spec	{$$ = $1;}
 |	union_type_spec	{$$ = $1;}
 |	VOID	{$$ = new_ast_data(0, DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_VOID));}
-|	IDENT /*typedef not implemented*/
+|	IDENT {$$ = NULL; /*typedef not implemented*/}
 ;
 
 enum_type_spec:
@@ -250,68 +245,73 @@ enum_constant_def:
 ;
 
 float_type_spec:
-	FLOAT
-|	DOUBLE
-|	LONG DOUBLE
-|	FLOAT COMPLEX
-|	DOUBLE COMPLEX
-|	LONG DOUBLE COMPLEX
+	FLOAT	{$$ = new_ast_data(sizeof (float), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_FLOAT));}
+|	DOUBLE	{$$ = new_ast_data(sizeof (double), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_DOUB));}
+|	LONG DOUBLE	{$$ = new_ast_data(sizeof (long double), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONGDOUB));}
+// complex not implemented, placeholders below
+|	FLOAT COMPLEX	{$$ = new_ast_data(sizeof (float), DATA_SCAL, QUAL_NONE, new_ast_scal(1, SCAL_FLOAT));}
+|	DOUBLE COMPLEX	{$$ = new_ast_data(sizeof (double), DATA_SCAL, QUAL_NONE, new_ast_scal(1, SCAL_DOUB));}
+|	LONG DOUBLE COMPLEX	{$$ = new_ast_data(sizeof (long double), DATA_SCAL, QUAL_NONE, new_ast_scal(1, SCAL_LONGDOUB));}
 ;
 
 int_type_spec:
-	signed_type_spec
-|	unsigned_type_spec
-|	char_type_spec
-|	BOOL
+	signed_type_spec	{$$ = $1;}
+|	unsigned_type_spec	{$$ = $1;}
+|	char_type_spec	{$$ = $1;}
+|	BOOL	{$$ = new_ast_data(sizeof (_Bool), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_FLOAT));}
 ;
 
 signed_type_spec:
-	SHORT
-|	SHORT INT
-|	SIGNED SHORT
-|	SIGNED SHORT INT
-|	INT
-|	SIGNED INT
+|	signed_opt SHORT int_opt	{$$ = new_ast_data(sizeof (short), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_SHORT));}
+|	signed_opt INT	{$$ = new_ast_data(sizeof (int), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_INT));}
+|	SIGNED	{$$ = new_ast_data(sizeof (int), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_INT));}
+|	signed_opt LONG	int_opt {$$ = new_ast_data(sizeof (long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONG));}
+|	signed_opt LONG LONG int_opt {$$ = new_ast_data(sizeof (long long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONGLONG));}
+;
+
+signed_opt:
+	%empty
 |	SIGNED
-|	LONG
-|	LONG INT
-|	SIGNED LONG
-|	SIGNED LONG INT
-|	LONG LONG
-|	LONG LONG INT
-|	SIGNED LONG LONG
-|	SIGNED LONG LONG INT
 ;
 
 unsigned_type_spec:
-	UNSIGNED SHORT
-|	UNSIGNED SHORT INT
-|	UNSIGNED INT
-|	UNSIGNED
-|	UNSIGNED LONG
-|	UNSIGNED LONG INT
-|	UNSIGNED LONG LONG
-|	UNSIGNED LONG LONG INT
+	UNSIGNED SHORT int_opt	{$$ = new_ast_data(sizeof (unsigned short), DATA_SCAL, QUAL_NONE, new_ast_scal(1, SCAL_SHORT));}
+|	UNSIGNED int_opt	{$$ = new_ast_data(sizeof (unsigned int), DATA_SCAL, QUAL_NONE, new_ast_scal(1, SCAL_INT));}
+|	UNSIGNED LONG int_opt	{$$ = new_ast_data(sizeof (unsigned long), DATA_SCAL, QUAL_NONE, new_ast_scal(1, SCAL_INT));}
+|	UNSIGNED LONG LONG int_opt	{$$ = new_ast_data(sizeof (unsigned long long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONGLONG));}
 ;
 
+int_opt:
+	%empty
+|	INT
+;
+
+// note: neutral chars mentioned in h&s, not differentiated below
 char_type_spec:
-	CHAR
-|	SIGNED CHAR
-|	UNSIGNED CHAR
+	CHAR	{$$ = new_ast_data(sizeof (char), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_CHAR));}
+|	SIGNED CHAR	{$$ = new_ast_data(sizeof (char), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_CHAR));}
+|	UNSIGNED CHAR	{$$ = new_ast_data(sizeof (unsigned char), DATA_SCAL, QUAL_NONE, new_ast_scal(1, SCAL_CHAR));}
 ;
 
 struct_type_spec:
-	struct_type_def
-|	struct_type_ref
+	struct_type_def	{$$ = $1;}
+|	struct_type_ref	{$$ = $1;}
 ;
 
 struct_type_def:
-	STRUCT '{' field_list '}'
+	STRUCT '{' field_list '}' {
+		$$ = new_ast_data(NULL, DATA_STRU, QUAL_NONE,
+			new_ast_stru(NULL));
+		$$->next = $3;
+	}
 |	STRUCT IDENT '{' field_list '}'
 ;
 
 struct_type_ref:
-	STRUCT IDENT
+	STRUCT IDENT	{
+		$$ = lookup(scope_tab, $2, SYM_STRU_T);
+		/*may be a forward reference so no error here*/
+	}
 ;
 
 union_type_spec:
@@ -341,9 +341,10 @@ component_declarator_list:
 |	component_declarator_list ',' component_declarator
 ;
 
+// bit field width should be constant expression, not NUM
 component_declarator:
 	declarator
-|	':' NUM // bit field width should be constant expression, not NUM
+|	':' NUM
 |	declarator ':' NUM
 ;
 
