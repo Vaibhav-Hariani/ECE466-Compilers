@@ -7,7 +7,7 @@
 
 //Undefined token, but lets parser.tab.h include everything
 %token
-TOKEOF	ELLIPSIS
+TOKEOF	ELLIPSIS	
 POUNDPOUND	AUTO	BREAK	CASE	CHAR	CONST	
 CONTINUE	DEFAULT	DO	DOUBLE	ELSE	ENUM	
 EXTERN	FLOAT	FOR	GOTO	IF	INLINE	INT	LONG	
@@ -59,7 +59,6 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
     #include "ast_nodes.h"
     #include "ast_symtab.h"
     #include <stdio.h>
-    #include "parse_output.h"
     #include "symtab_output.h"
     void yyerror(const char * s);
 
@@ -71,8 +70,10 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 		int last_column;
 		char *filename;
 	} YYLTYPE;
+}
 
-	ast_tab_t *scope_tab;
+%code {
+	ast_tab_t *scope_tab = NULL;
 }
 
 %define api.location.type {YYLTYPE}
@@ -91,7 +92,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <data> type_name;
 %nterm <sym> prog declaration_or_fndef function_def;
 %nterm <sym> compound_statement decl_or_stmt decl_or_stmt_list
-%nterm <sym> declaration declaration_spec param_declaration;
+%nterm <sym> declaration declaration_spec untyped_declaration_spec param_declaration;
 %nterm <sym> init_declarator init_declarator_list;
 %nterm <sym> enum_def_list component_declaration;
 %nterm <sym> component_declarator component_declarator_list;
@@ -167,8 +168,7 @@ compound_statement:
 
 decl_or_stmt_list:
 	%empty	{$$ = NULL;}
-|	decl_or_stmt {$$ = $1;}
-|	decl_or_stmt_list decl_or_stmt {$2->next = $1;}
+|	decl_or_stmt_list decl_or_stmt {$2->next = $1; $$ = $2;}
 ;
 
 decl_or_stmt:
@@ -220,25 +220,18 @@ declaration:
 //
 
 declaration_spec:
-	stgclass_spec	{
-		$$ = new_ast_sym(NULL, $1, SYM_NONE, NULL,
-			@1.filename, @1.first_line);
-		}
-|	type_spec	{
+	type_spec	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE, $1,
 			@1.filename, @1.first_line);
 		}
-|	qual_spec	{
-		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
-			new_ast_data(0, DATA_NONE, $1, NULL),
-			@1.filename, @1.first_line);
+|	type_spec untyped_declaration_spec	{
+		if ($2->data != NULL) {
+			/*ERROR*/
+		} else {
+			$2->data = $1;
 		}
-|	func_spec	{
-		$$ = new_ast_sym(NULL, STG_NONE, SYM_FUNC,
-			new_ast_data(0, DATA_FUNC, QUAL_NONE, NULL),
-			@1.filename, @1.first_line);
-		$$->is_inline = 1;
-		}
+		$$ = $2;
+	}
 |	stgclass_spec declaration_spec {
 		if ($2->stg_type != STG_NONE && $2->stg_type != $1) {
 			/*ERROR*/
@@ -261,23 +254,51 @@ declaration_spec:
 		} else {
 			$2->sym_type = SYM_FUNC;
 		}
-		/* if ($2->data == NULL) {
-			$2->data = new_ast_data(0, DATA_FUNC, QUAL_NONE, NULL);
-		} else {
-			$2->data->data_type = DATA_FUNC;
-		}*/
 		$2->is_inline = 1;
 		$$ = $2;
 	}
-|	type_spec declaration_spec {
-		if ($2->data != NULL) {
+
+untyped_declaration_spec:
+	stgclass_spec	{
+		$$ = new_ast_sym(NULL, $1, SYM_NONE, NULL,
+			@1.filename, @1.first_line);
+		}
+|	qual_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+			new_ast_data(0, DATA_NONE, $1, NULL),
+			@1.filename, @1.first_line);
+		}
+|	func_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_FUNC,
+			new_ast_data(0, DATA_FUNC, QUAL_NONE, NULL),
+			@1.filename, @1.first_line);
+		$$->is_inline = 1;
+		}
+|	stgclass_spec untyped_declaration_spec {
+		if ($2->stg_type != STG_NONE && $2->stg_type != $1) {
 			/*ERROR*/
 		} else {
-			$2->data = $1;
+			$2->stg_type = $1;
 		}
 		$$ = $2;
 	}
-;
+|	qual_spec untyped_declaration_spec {
+		if ($2->data == NULL) {
+			$2->data = new_ast_data(0, DATA_NONE, $1, NULL);
+		} else {
+			$2->data->qual |= $1;
+		}
+		$$ = $2;
+	}
+|	func_spec untyped_declaration_spec {
+		if ($2->sym_type != SYM_NONE && $2->sym_type != SYM_FUNC) {
+			/*ERROR*/
+		} else {
+			$2->sym_type = SYM_FUNC;
+		}
+		$2->is_inline = 1;
+		$$ = $2;
+	}
 
 stgclass_spec:
 	EXTERN	{$$ = (char) STG_EXTERN_EXP;}
@@ -304,7 +325,7 @@ type_spec:
 |	struct_type_spec	{$$ = $1;}
 |	union_type_spec	{$$ = $1;}
 |	VOID	{$$ = new_ast_data(0, DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_VOID));}
-|	IDENT {$$ = NULL; /*typedef not implemented*/}
+// |	IDENT {$$ = NULL; /*typedef not implemented*/}
 ;
 
 enum_type_spec:
@@ -620,7 +641,6 @@ pointer:
 
 qual_spec_list:
 	%empty {$$ = 0;}
-|	qual_spec {$$ = $1;}
 |	qual_spec_list qual_spec {$$ |= $1;}
 ;
 

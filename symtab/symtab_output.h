@@ -12,8 +12,8 @@ int print_params(ast_tab_t *tab, int num_tabs);
 int print_data(ast_data_t *data, int num_tabs);
 
 // Prints definition information, scope and data type of
-// memb, a member of the struct/union/enum (disambiguated
-// by data_name) sym.  
+// memb, a member of the struct/union (disambiguated by
+// data_name) sym.  
 int print_memb_decl(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_name);
 
 // Prints declaration, scope, storage class and data type

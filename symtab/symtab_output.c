@@ -21,6 +21,7 @@ int print_qual(char qual) {
     } if (qual & QUAL_RESTRICT) {
         printf("restrict ");
     }
+    return 0;
 }
 
 int print_scal(char unsign, char scal_type) {
@@ -114,7 +115,7 @@ int print_params(ast_tab_t *tab, int num_tabs) {
 
     curr = tab->misc;
     while (curr != NULL) {
-        print_ident(num_tabs);
+        print_indent(num_tabs);
         printf("parameter %s {\n", curr->name);
         print_indent(num_tabs + 1);
         printf("stg class: \t");
@@ -248,11 +249,11 @@ int print_obj_def(ast_sym_t *sym, int num_tabs) {
     data_name = NULL;
     switch (sym->sym_type) {
         case SYM_STRU_T:
-            strdup(data_name, "struct");
+            data_name = strdup("struct");
             memb = sym->data->node->stru->minitab->memb;
             break;
         case SYM_UNIO_T:
-            strdup(data_name, "union");
+            data_name = strdup("union");
             memb = sym->data->node->unio->minitab->memb;
             break;
     }
@@ -265,7 +266,7 @@ int print_obj_def(ast_sym_t *sym, int num_tabs) {
     print_scope(sym->tab->scope_type, sym->tab->filename, sym->tab->line);
     
     while (memb != NULL) {
-        print_memb_decl(memb, num_tabs + 1, data_name, sym->name);
+        print_memb_decl(memb, sym, num_tabs + 1, data_name);
         memb = memb->next;
     }
     print_indent(num_tabs);
