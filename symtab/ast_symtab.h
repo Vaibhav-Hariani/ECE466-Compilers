@@ -7,6 +7,7 @@ enum scope_type {
     SCOPE_NONE = 0,
     SCOPE_FILE,
     SCOPE_FUNC,
+    SCOPE_VUNC,
     SCOPE_BLOCK,
     SCOPE_PROTO,
     SCOPE_STRUNIO,
@@ -39,6 +40,7 @@ enum ns_type {
     NS_LABEL
 };
 
+// bitwise OR used in comb_ast_data()
 enum data_type {
     DATA_NONE = 0,
     DATA_SCAL,
@@ -79,7 +81,6 @@ enum stg_type {
 };
 
 // get/set with bitwise operations
-// don't ask me why i did it this way
 enum qual_type {
     QUAL_NONE = 0,
     QUAL_CONST = 1,     // 001
@@ -128,6 +129,7 @@ struct ast_sym {
     char is_inline;
     int offset;
     ast_data_t *data;
+    ast_data_t *tail;
 };
 
 // Each symbol table contains a pointer
@@ -187,6 +189,7 @@ struct ast_unio {
 };
 
 struct ast_enu {
+    char is_complete;
     ast_sym_t *tag;
 };
 
@@ -208,6 +211,22 @@ union ast_type *new_ast_label(char is_complete);
 // Creates ast_data_t object with specified type, qualifiers
 // and type node and returns its address.
 ast_data_t *new_ast_data(int size, char data_type, char qual, union ast_type *node);
+
+// Recursively creates a deep copy of data down to the
+// specified depth, beyond which further nested data is
+// shallow copied. Depth = -1 results in a full-ish
+// deep copy.
+ast_data_t *copy_ast_data(ast_data_t *data, int depth);
+
+// Makes a deep copy of the params table of the symbol
+// table of a function type (shallow once it reaches the
+// types of the symbols within).
+ast_tab_t *copy_params(ast_tab_t *params);
+
+// Dynamically allocates and creates a pointer to the
+// composite type for src and target if both are compatible.
+// Returns NULL if no such type could be created.
+ast_data_t *comb_ast_data(ast_data_t *src, ast_data_t *target);
 
 // Recursively frees data type pointed to by data.
 int del_ast_data(ast_data_t *data);
@@ -269,10 +288,14 @@ int struct_fix(ast_data_t *data);
 // unions of its own type, nested definitions.
 int union_fix(ast_data_t *data);
 
+// Installs tail at the reasonable spot in data, which
+// represents the current tail. Returns tail on success.
+ast_data_t *install_tail(ast_data_t *data, ast_data_t *tail);
+
 // may need to be implemented differently altogether.
 // Returns a pointer to the merged type. Guarantees the
 // data pointed to by spec is unchanged (it stays entirely
-// separate from head and tail).
-ast_data_t *merge_types(ast_data_t *spec, ast_data_t *head, ast_data_t *tail);
+// separate from data).
+ast_data_t *merge_types(ast_data_t *spec, ast_data_t *data);
 
 #endif // AST_SYMTAB_H

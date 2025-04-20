@@ -76,19 +76,25 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %locations
 
 %nterm <i> enum_constant_def ident_opt
-%nterm <c> stgclass_spec qual_spec
+%nterm <c> stgclass_spec qual_spec qual_spec_list
 %nterm <data> type_spec
 %nterm <data> enum_type_spec enum_type_def enum_type_ref
 %nterm <data> struct_type_spec struct_type_def struct_type_ref
 %nterm <data> union_type_spec union_type_def union_type_ref
 %nterm <data> float_type_spec int_type_spec
 %nterm <data> signed_type_spec unsigned_type_spec char_type_spec
-%nterm <data> type_name abstract_declarator
-%nterm <sym> declaration declaration_spec init_declarator_list
-%nterm <sym> declarator declarator_list 
+%nterm <data> pointer
+%nterm <data> type_name
+%nterm <sym> declaration_or_fndef function_def
+%nterm <sym> declaration declaration_spec param_declaration
+%nterm <sym> init_declarator init_declarator_list
 %nterm <sym> component_declaration
 %nterm <sym> component_declarator component_declarator_list
+%nterm <sym> declarator declarator_list
+%nterm <sym> direct_declarator array_declarator function_declarator
+%nterm <sym> param_declarator abstract_declarator direct_abstract_declarator
 %nterm <tab> field_list
+%nterm <tab> param_type_list_opt param_type_list param_list
 %nterm enum_def_list;
 %token <i> IDENT;
 %token <c> CHARLIT;
@@ -102,16 +108,107 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 // as such, they can be ternarys, pointers, or identifiers. Nothing else.
 //unops take in an lvalue, and do one of 3 operations to them.
 
-// prog: %empty {$$=0;}
-// | prog term_expr ';'  {$$ = print_ast($2);}
-// ;
-
-declaration:
-	declaration_spec ';'
-|	declaration_spec init_declarator_list ';'
+prog:
+	%empty {$$ = NULL;}
+|	declaration_or_fndef	{
+		if ($1->sym_type == SYM_VAR || $1->sym_type == SYM_FUNC) {
+			print_sym_decl($1, 0);
+		} else {
+			print_obj_def($1, 0);
+		}
+	}
 ;
 
+declaration_or_fndef:
+	declaration {$$ = $1;}
+|	function_def {$$ = $1;}
+;
+
+function_def: /*does not support k&r style*/
+	declaration_spec declarator compound_statement {
+		int temp;
+		ast_sym_t *curr;
+
+		switch ($1->stg_type) {
+			case STG_EXTERN_EXP:
+			case STG_STATIC:
+			case STG_REGISTER:
+				temp = $1->stg_type;
+				break;
+			default:
+				if (scope_tab->scope_type == SCOPE_FILE) {
+					temp = STG_EXTERN_IMP;
+				} else {
+					temp = STG_AUTO_LOC;
+				}
+				break;
+		}
+		curr->stg_type = temp;
+		// curr->sym_type = SYM_;
+		merge_types($1->data, curr->data);
+		del_ast_sym($1);
+		enter(scope_tab, $2, 1);
+	}
+;
+
+compound_statement:
+	'{' decl_or_stmt_list '}'
+;
+
+decl_or_stmt_list:
+	%empty
+|	decl_or_stmt
+|	decl_or_stmt_list decl_or_stmt
+;
+
+decl_or_stmt:
+	declaration {$$ = $1;}
+|	statement
+;
+
+declaration:
+	struct_type_spec ';'
+|	union_type_spec ';'
+|	enum_type_spec ';'
+|	declaration_spec init_declarator_list ';' {
+		int temp;
+		ast_sym_t *curr;
+
+		switch ($1->stg_type) {
+			case STG_EXTERN_EXP:
+			case STG_STATIC:
+			case STG_REGISTER:
+				temp = $1->stg_type;
+				break;
+			default:
+				if (scope_tab->scope_type == SCOPE_FILE) {
+					temp = STG_EXTERN_IMP;
+				} else {
+					temp = STG_AUTO_LOC;
+				}
+				break;
+		}
+
+		curr = $2;
+		while (curr != NULL) {
+			curr->stg_type = temp;
+			// curr->sym_type = SYM_;
+			merge_types($1->data, curr->data);
+			curr = curr->next;
+		}
+		del_ast_sym($1);
+		enter(scope_tab, $2, 1);
+	}
+;
+
+statement:
+	compound_statement
+// |	expr ';' // not combined with parser yet
+;
+
+//
 // declaration specifiers
+//
 
 declaration_spec:
 	stgclass_spec	{
@@ -434,8 +531,8 @@ component_declaration:
 component_declarator_list:
 	component_declarator {$$ = $1;}
 |	component_declarator_list ',' component_declarator {
-		$$ = $1;
-		$$->next = $2;
+		$$ = $2;
+		$$->next = $1;
 	}
 ;
 
@@ -462,101 +559,163 @@ type_name:
 // declarators
 
 init_declarator_list:
-	init_declarator_list
-|	init_declarator_list ',' init_declarator
+	init_declarator {$$ = $1;}
+|	init_declarator_list ',' init_declarator {
+		$$ = $2;
+		$$->next = $1;
+	}
 ;
 
 init_declarator:
-	declarator
-// |	declarator '=' init // circle back later, h&s 4.6. involves parser
+	declarator {$$ = $1;}
+// |	declarator '=' init {$$ = $1; /*circle back later, h&s 4.6. involves parser*/}
 ;
 
 declarator:
-	pointer_declarator
-|	direct_declarator
-;
-
-pointer_declarator:
-	pointer direct_declarator
+|	direct_declarator {$$ = $1;}
+	pointer direct_declarator {
+		$2->tail = install_tail($2->tail, $1);
+		$$ = $2;
+	}
 ;
 
 pointer:
-	'*'
-|	'*' qual_spec_list
-|	'*' pointer
-|	'*' qual_spec_list pointer
+|	'*' qual_spec_list	{
+		$$ = new_ast_data(sizeof (void *), DATA_PTR, $2,
+			new_ast_ptr(NULL));
+		}
+|	'*' qual_spec_list pointer	{
+		$$ = new_ast_data(sizeof (void *), DATA_PTR, $2,
+			new_ast_ptr($3));
+		}
 ;
 
 qual_spec_list:
-	qual_spec
-|	qual_spec_list qual_spec
+	%empty {$$ = 0;}
+|	qual_spec {$$ = $1;}
+|	qual_spec_list qual_spec {$$ |= $1;}
 ;
 
 direct_declarator:
-	simple_declarator
-|	'(' declarator ')'
-|	array_declarator
-|	function_declarator
-;
-
-simple_declarator:
-	IDENT
+	IDENT	{$$ = new_ast_sym($1, STG_NONE, SYM_NONE, NULL, @1.filename, @1.line);}
+|	'(' declarator ')'	{$$ = $1;}
+|	array_declarator	{$$ = $1;}
+|	function_declarator	{$$ = $1;}
 ;
 
 array_declarator:
-	direct_declarator '[' ']'
-|	direct_declarator '[' NUM ']' // our simplification
+	direct_declarator '[' NUM_opt ']' {
+		$1->tail = install_tail($1->tail,
+			new_ast_data(0, DATA_ARY, QUAL_NONE,
+				new_ast_ary($3, NULL)));
+		$$ = $1;
+	}
+// |	direct_declarator '[' expr ']' // should be expression ast
 ;
 
 function_declarator:
-	direct_declarator '{' '}'
-|	direct_declarator '{' param_type_list '}'
-|	direct_declarator '{' ident_list '}'	
+	direct_declarator '(' param_type_list_opt ')' {
+		$1->tail = install_tail($1->tail,
+			new_ast_data(0, DATA_FUNC, QUAL_NONE,
+				new_ast_func(0, NULL, $3)));
+		$$ = $1;
+	}
+// |	direct_declarator '(' ident_list ')' // k&r optional syntax
+;
+
+param_type_list_opt:
+	%empty	{$$ = NULL;}
+|	param_type_list	{$$ = $1;}
 ;
 
 param_type_list:
-	param_list
-|	param_list ',' '...'
+	param_list	{$$ = $1;}
+|	param_list ',' '...' {$$ = $1; $$->scope_type = SCOPE_VFUNC;}
 ;
 
 param_list:
-	param_declaration
-|	param_list ',' param_declaration
+	param_declaration {
+		$$ = new_ast_tab(scope_tab, SCOPE_FUNC, @1.filename, @1.line);
+		enter($$, $1, 0);
+	}
+|	param_list ',' param_declaration {
+		enter($$, $1, 0);
+	}
 ;
 
 param_declaration:
-	declaration_spec declarator
-|	declaration_spec abstract_declarator
-|	declaration_spec
+	declaration_spec param_declarator {
+		($1->stg_type == STG_REGISTER) {
+			$2->stg_type = STG_REGISTER;
+		} else {
+			$2->stg_type = STG_AUTO_PAR;
+			if ($1->stg_type != STG_NONE) {
+				/*ERROR invalid stg class for parameter*/
+			}
+		}
+		$2->sym_type = SYM_PARAM;
+		merge_types($1->data, $2->data);
+		del_ast_sym($1);
+	}
+|	declaration_spec {
+		$1->stg_type = STG_AUTO_PAR;
+		$1->sym_type = SYM_PARAM;
+		$$ = $1;
+	}
+;
+
+param_declarator:
+	declarator	{$$ = $1;}
+|	abstract_declarator	{$$ = $1;}
 ;
 
 abstract_declarator:
-	pointer
-|	pointer direct_abstract_declarator
-|	direct_abstract_declarator
+	pointer {
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE, $1,
+			@1.filename, @1.line);
+	}
+|	pointer direct_abstract_declarator {
+		$2->tail = install_tail($2->tail, $1);
+		$$ = $2;
+	}
+|	direct_abstract_declarator {$$ = $1;}
 ;
 
 direct_abstract_declarator:
-	'(' abstract_declarator ')'
-|	'[' ']'
-|	'[' NUM ']'
-|	direct_abstract_declarator '[' ']'
-|	direct_abstract_declarator '[' NUM ']'
-|	'(' ')'
-|	'(' param_type_list')'
-|	direct_abstract_declarator '(' ')'
-|	direct_abstract_declarator '(' param_type_list')'
-;	
-
-ident_list:
-	IDENT
-|	param_list ',' IDENT
+	'(' abstract_declarator ')' {$$ = $1;}
+|	'[' NUM_opt ']' {
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+			new_ast_data(0, DATA_ARY, QUAL_NONE,
+				new_ast_ary($2, NULL)));
+	}
+|	direct_abstract_declarator '[' NUM_opt ']'  {
+		$1->tail = install_tail($1->tail,
+			new_ast_data(0, DATA_ARY, QUAL_NONE,
+				new_ast_ary($3, NULL)));
+		$$ = $1;
+	}
+|	'(' param_type_list_opt ')' {
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+			new_ast_data(0, DATA_FUNC, QUAL_NONE,
+				new_ast_func(0, NULL, $2)));
+	}
+|	direct_abstract_declarator '(' param_type_list_opt ')' {
+		$1->tail = install_tail($1->tail,
+			new_ast_data(0, DATA_FUNC, QUAL_NONE,
+				new_ast_func(0, NULL, $3)));
+		$$ = $1;
+	}
 ;
 
-ident_opt:
-	%empty	{$$ = NULL;}
-|	IDENT	{$$ = $1;}
-;
+// ident_list: // k&r optional syntax
+// 	IDENT
+// |	param_list ',' IDENT
+// ;
+
+NUM_opt {
+	%empty {$$ = (TypedNumber) {.val = 0, .type = TYPE_I};};
+|	NUM {$$ = $1;}
+}
 
 comma_opt:
 	%empty
