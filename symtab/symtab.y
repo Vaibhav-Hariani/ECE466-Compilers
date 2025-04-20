@@ -1,5 +1,5 @@
 %{
-     #include "parser.tab.h"
+     #include "symtab.tab.h"
      int yylex(void);
      extern FILE *yyin;
  %}
@@ -7,7 +7,7 @@
 
 //Undefined token, but lets parser.tab.h include everything
 %token
-TOKEOF	ELLIPSIS	
+TOKEOF	ELLIPSIS
 POUNDPOUND	AUTO	BREAK	CASE	CHAR	CONST	
 CONTINUE	DEFAULT	DO	DOUBLE	ELSE	ENUM	
 EXTERN	FLOAT	FOR	GOTO	IF	INLINE	INT	LONG	
@@ -69,33 +69,34 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 		char *filename;
 	} YYLTYPE;
 
-	sym_tab_t *scope_tab;
+	ast_tab_t *scope_tab;
 }
 
 %define api.location.type {YYLTYPE}
 %locations
 
-%nterm <i> enum_constant_def ident_opt
-%nterm <c> stgclass_spec qual_spec qual_spec_list
-%nterm <data> type_spec
-%nterm <data> enum_type_spec enum_type_def enum_type_ref
-%nterm <data> struct_type_spec struct_type_def struct_type_ref
-%nterm <data> union_type_spec union_type_def union_type_ref
-%nterm <data> float_type_spec int_type_spec
-%nterm <data> signed_type_spec unsigned_type_spec char_type_spec
-%nterm <data> pointer
-%nterm <data> type_name
-%nterm <sym> declaration_or_fndef function_def
-%nterm <sym> declaration declaration_spec param_declaration
-%nterm <sym> init_declarator init_declarator_list
-%nterm <sym> component_declaration
-%nterm <sym> component_declarator component_declarator_list
-%nterm <sym> declarator declarator_list
-%nterm <sym> direct_declarator array_declarator function_declarator
-%nterm <sym> param_declarator abstract_declarator direct_abstract_declarator
-%nterm <tab> field_list
-%nterm <tab> param_type_list_opt param_type_list param_list
-%nterm enum_def_list;
+%nterm <i> enum_constant_def;
+%nterm <c> stgclass_spec qual_spec qual_spec_list;
+%nterm <n> num_opt;
+%nterm <data> type_spec;
+%nterm <data> enum_type_spec enum_type_def enum_type_ref;
+%nterm <data> struct_type_spec struct_type_def struct_type_ref;
+%nterm <data> union_type_spec union_type_def union_type_ref;
+%nterm <data> float_type_spec int_type_spec;
+%nterm <data> signed_type_spec unsigned_type_spec char_type_spec;
+%nterm <data> pointer;
+%nterm <data> type_name;
+%nterm <sym> prog declaration_or_fndef function_def;
+%nterm <sym> compound_statement decl_or_stmt decl_or_stmt_list
+%nterm <sym> declaration declaration_spec param_declaration;
+%nterm <sym> init_declarator init_declarator_list;
+%nterm <sym> enum_def_list component_declaration;
+%nterm <sym> component_declarator component_declarator_list;
+%nterm <sym> declarator declarator_list;
+%nterm <sym> direct_declarator array_declarator function_declarator;
+%nterm <sym> param_declarator abstract_declarator direct_abstract_declarator;
+%nterm <tab> field_list;
+%nterm <tab> param_type_list_opt param_type_list param_list;
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
@@ -126,50 +127,56 @@ declaration_or_fndef:
 
 function_def: /*does not support k&r style*/
 	declaration_spec declarator compound_statement {
-		int temp;
-		ast_sym_t *curr;
+		if ($2->data->data_type != DATA_FUNC) {
+			/*ERROR expected a semicolon after declarator*/
+		}
+
+		$2->sym_type = SYM_FUNC;
 
 		switch ($1->stg_type) {
 			case STG_EXTERN_EXP:
 			case STG_STATIC:
-			case STG_REGISTER:
-				temp = $1->stg_type;
+				$2->stg_type = $1->stg_type;
+				break;
+			case STG_NONE:
+				$2->stg_type = STG_EXTERN_IMP;
 				break;
 			default:
-				if (scope_tab->scope_type == SCOPE_FILE) {
-					temp = STG_EXTERN_IMP;
-				} else {
-					temp = STG_AUTO_LOC;
-				}
+				/*ERROR invalid storage class specifier*/
+				$2->stg_type = STG_EXTERN_IMP;
 				break;
 		}
-		curr->stg_type = temp;
-		// curr->sym_type = SYM_;
-		merge_types($1->data, curr->data);
+
+		if ($1->data->qual != QUAL_NONE) {
+			/*ERROR qualifiers invalid*/
+		}
+
+		$2->tail = install_tail($2->data, $1->data);
 		del_ast_sym($1);
 		enter(scope_tab, $2, 1);
+		$$ = $2;
 	}
 ;
 
 compound_statement:
-	'{' decl_or_stmt_list '}'
+	'{' decl_or_stmt_list '}'	{$$ = $2;}
 ;
 
 decl_or_stmt_list:
-	%empty
-|	decl_or_stmt
-|	decl_or_stmt_list decl_or_stmt
+	%empty	{$$ = NULL;}
+|	decl_or_stmt {$$ = $1;}
+|	decl_or_stmt_list decl_or_stmt {$2->next = $1;}
 ;
 
 decl_or_stmt:
 	declaration {$$ = $1;}
-|	statement
+// |	statement {$$ = NULL;}
 ;
 
 declaration:
-	struct_type_spec ';'
-|	union_type_spec ';'
-|	enum_type_spec ';'
+	struct_type_spec ';' {$$->node->stru->tag}
+|	union_type_spec ';' {$$->node->unio->tag}
+|	enum_type_spec ';' {$$->node->enu->tag}
 |	declaration_spec init_declarator_list ';' {
 		int temp;
 		ast_sym_t *curr;
@@ -192,8 +199,7 @@ declaration:
 		curr = $2;
 		while (curr != NULL) {
 			curr->stg_type = temp;
-			// curr->sym_type = SYM_;
-			merge_types($1->data, curr->data);
+			curr->tail = install_tail(curr->data, $1->data);
 			curr = curr->next;
 		}
 		del_ast_sym($1);
@@ -201,8 +207,8 @@ declaration:
 	}
 ;
 
-statement:
-	compound_statement
+// statement:
+// 	compound_statement
 // |	expr ';' // not combined with parser yet
 ;
 
@@ -279,7 +285,7 @@ stgclass_spec:
 ;
 
 qual_spec:
-|	CONST	{$$ = (char) QUAL_CONST;}
+	CONST	{$$ = (char) QUAL_CONST;}
 |	VOLATILE	{$$ = (char) QUAL_VOLATILE;}
 |	RESTRICT	{$$ = (char) QUAL_RESTRICT;}
 ;
@@ -332,17 +338,19 @@ enum_def_list:
 	enum_constant_def	{
 		$$ = new_ast_sym($1, STG_NONE, SYM_ENUM_C, NULL,
 			@1.filename, @1.line);
+		// install into symbol table
 	}
 |	enum_def_list ',' enum_constant_def	{
 		$$ = new_ast_sym($3, STG_NONE, SYM_ENUM_C, NULL,
 			@3.filename, @3.line);
 		$$->next = $1;
+		// install into symbol table
 	}
 ;
 
 enum_constant_def:
 	IDENT	{$$ = $1;}
-	// IDENT '=' expr // circle back when combining with parser
+// |	IDENT '=' expr // circle back when combining with parser
 ;
 
 float_type_spec:
@@ -363,11 +371,11 @@ int_type_spec:
 ;
 
 signed_type_spec:
-|	signed_opt SHORT int_opt	{$$ = new_ast_data(sizeof (short), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_SHORT));}
+	signed_opt SHORT int_opt	{$$ = new_ast_data(sizeof (short), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_SHORT));}
 |	signed_opt INT	{$$ = new_ast_data(sizeof (int), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_INT));}
 |	SIGNED	{$$ = new_ast_data(sizeof (int), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_INT));}
-|	signed_opt LONG	int_opt {$$ = new_ast_data(sizeof (long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONG));}
-|	signed_opt LONG LONG int_opt {$$ = new_ast_data(sizeof (long long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONGLONG));}
+|	signed_opt LONG	int_opt	{$$ = new_ast_data(sizeof (long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONG));}
+|	signed_opt LONG LONG int_opt	{$$ = new_ast_data(sizeof (long long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONGLONG));}
 ;
 
 signed_opt:
@@ -464,17 +472,17 @@ union_type_def:
 				$3));
 		
 		$$->node->unio->tag->data = $$;
-		unio_fix($$);
+		union_fix($$);
 		$$->node->unio->is_complete = 1;
 	}
 |	UNION IDENT '{' field_list '}'  {
 		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
 		if (temp != NULL && temp->tab == scope_tab) {
-			if (temp->data->unio->is_complete) {
+			if (temp->data->node->unio->is_complete) {
 				/*ERROR redeclaration not permitted*/
 			} else {
 				$$ = temp->data;
-				$$->data->node->unio->minitab = $4;
+				$$->node->unio->minitab = $4;
 			}
 		} else {
 		$$ = new_ast_data(0, DATA_UNIO, QUAL_NONE,
@@ -493,16 +501,17 @@ union_type_def:
 
 union_type_ref:
 	UNION IDENT	{
-		$$ = lookup(scope_tab, $2, SYM_UNIO_T);
-		if ($$ == NULL) {
+		ast_sym_t *temp = lookup(scope_tab, $2, SYM_UNIO_T);
+		if (temp == NULL) {
 			/*install incomplete tag in symbol table*/
-			$$ = new_ast_sym($2, STG_NONE, SYM_UNIO_T,
+			temp = new_ast_sym($2, STG_NONE, SYM_UNIO_T,
 				new_ast_data(0, DATA_UNIO, QUAL_NONE,
 					new_ast_unio(0, NULL, NULL)),
 				@1.filename, @1.line);
-			$$->data->node->unio->tag->$$;
-			enter(scope_tab, $$, 0);
+			temp->data->node->unio->tag = temp;
+			enter(scope_tab, temp, 0);
 		}
+		$$ = temp->data;
 	}
 ;
 
@@ -521,7 +530,7 @@ component_declaration:
 	type_spec component_declarator_list ';' {
 		ast_sym_t *temp = $2;
 		while (temp != NULL) {
-			temp->data = merge_types($1, temp->data, NULL);
+			temp->tail = install_tail(temp->data, $1);
 			temp = temp->next;
 		}
 		$$ = $2;
@@ -531,7 +540,7 @@ component_declaration:
 component_declarator_list:
 	component_declarator {$$ = $1;}
 |	component_declarator_list ',' component_declarator {
-		$$ = $2;
+		$$ = $3;
 		$$->next = $1;
 	}
 ;
@@ -550,9 +559,9 @@ type_name:
 		free($1); // not entering symbol table
 	}
 |	declaration_spec abstract_declarator {
-		$$ = $1->data;
+		install_tail($2, $1->data);
 		free($1); // not entering symbol table
-		merge_types($$, $2);
+		$$ = $2;
 	}
 ;
 
@@ -561,7 +570,7 @@ type_name:
 init_declarator_list:
 	init_declarator {$$ = $1;}
 |	init_declarator_list ',' init_declarator {
-		$$ = $2;
+		$$ = $3;
 		$$->next = $1;
 	}
 ;
@@ -572,15 +581,15 @@ init_declarator:
 ;
 
 declarator:
-|	direct_declarator {$$ = $1;}
-	pointer direct_declarator {
+	direct_declarator {$$ = $1;}
+|	pointer direct_declarator {
 		$2->tail = install_tail($2->tail, $1);
 		$$ = $2;
 	}
 ;
 
 pointer:
-|	'*' qual_spec_list	{
+	'*' qual_spec_list	{
 		$$ = new_ast_data(sizeof (void *), DATA_PTR, $2,
 			new_ast_ptr(NULL));
 		}
@@ -598,13 +607,13 @@ qual_spec_list:
 
 direct_declarator:
 	IDENT	{$$ = new_ast_sym($1, STG_NONE, SYM_NONE, NULL, @1.filename, @1.line);}
-|	'(' declarator ')'	{$$ = $1;}
+|	'(' declarator ')'	{$$ = $2;}
 |	array_declarator	{$$ = $1;}
 |	function_declarator	{$$ = $1;}
 ;
 
 array_declarator:
-	direct_declarator '[' NUM_opt ']' {
+	direct_declarator '[' num_opt ']' {
 		$1->tail = install_tail($1->tail,
 			new_ast_data(0, DATA_ARY, QUAL_NONE,
 				new_ast_ary($3, NULL)));
@@ -630,7 +639,7 @@ param_type_list_opt:
 
 param_type_list:
 	param_list	{$$ = $1;}
-|	param_list ',' '...' {$$ = $1; $$->scope_type = SCOPE_VFUNC;}
+|	param_list ',' ELLIPSIS {$$ = $1; $$->scope_type = SCOPE_VUNC;}
 ;
 
 param_list:
@@ -639,13 +648,14 @@ param_list:
 		enter($$, $1, 0);
 	}
 |	param_list ',' param_declaration {
-		enter($$, $1, 0);
+		$$ = $1;
+		enter($$, $3, 0);
 	}
 ;
 
 param_declaration:
 	declaration_spec param_declarator {
-		($1->stg_type == STG_REGISTER) {
+		if ($1->stg_type == STG_REGISTER) {
 			$2->stg_type = STG_REGISTER;
 		} else {
 			$2->stg_type = STG_AUTO_PAR;
@@ -654,7 +664,7 @@ param_declaration:
 			}
 		}
 		$2->sym_type = SYM_PARAM;
-		merge_types($1->data, $2->data);
+		$2->tail = install_tail($2->data, $1->data);
 		del_ast_sym($1);
 	}
 |	declaration_spec {
@@ -682,13 +692,14 @@ abstract_declarator:
 ;
 
 direct_abstract_declarator:
-	'(' abstract_declarator ')' {$$ = $1;}
-|	'[' NUM_opt ']' {
+	'(' abstract_declarator ')' {$$ = $2;}
+|	'[' num_opt ']' {
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_ARY, QUAL_NONE,
-				new_ast_ary($2, NULL)));
+				new_ast_ary($2, NULL)),
+			@1.filename, @1.line);
 	}
-|	direct_abstract_declarator '[' NUM_opt ']'  {
+|	direct_abstract_declarator '[' num_opt ']'  {
 		$1->tail = install_tail($1->tail,
 			new_ast_data(0, DATA_ARY, QUAL_NONE,
 				new_ast_ary($3, NULL)));
@@ -697,7 +708,8 @@ direct_abstract_declarator:
 |	'(' param_type_list_opt ')' {
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_FUNC, QUAL_NONE,
-				new_ast_func(0, NULL, $2)));
+				new_ast_func(0, NULL, $2)),
+			@1.filename, @1.line);
 	}
 |	direct_abstract_declarator '(' param_type_list_opt ')' {
 		$1->tail = install_tail($1->tail,
@@ -712,10 +724,10 @@ direct_abstract_declarator:
 // |	param_list ',' IDENT
 // ;
 
-NUM_opt {
-	%empty {$$ = (TypedNumber) {.val = 0, .type = TYPE_I};};
+num_opt:
+	%empty {$$ = (TypedNumber) {{.i = 0}, TYPE_I};};
 |	NUM {$$ = $1;}
-}
+;
 
 comma_opt:
 	%empty

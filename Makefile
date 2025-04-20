@@ -6,10 +6,10 @@ all: parser
 flex: lexer/lex.l
 	cd lexer && flex lex.l
 
-bison: parser/ast_nodes.c parser/ast_nodes.h parser/parser.y parser/parse_output.h
+bison_parser: parser/ast_nodes.c parser/ast_nodes.h parser/parser.y parser/parse_output.h
 	cd parser && bison -d parser.y
 
-bison_debug: parser/ast_nodes.c parser/ast_nodes.h parser/parser.y
+bison_parser_debug: parser/ast_nodes.c parser/ast_nodes.h parser/parser.y
 	cd parser && bison --debug -d parser.y 
 
 parser: flex bison
@@ -18,5 +18,17 @@ parser: flex bison
 debug_parser: flex bison_debug
 	gcc -o parser/parser_debug.out $(CFLAGS) -g parser/parser.tab.c lexer/lex.yy.c parser/ast_nodes.c parser/parse_output.c
 
+bison_symtab: symtab/ast_symtab.c symtab/ast_symtab.h symtab/symtab.y symtab/symtab_output.h parser/ast_nodes.c parser/ast_nodes.h
+	cd symtab && bison -Wno-yacc -d symtab.y
+
+bison_symtab_debug: symtab/ast_symtab.c symtab/ast_symtab.h symtab/symtab.y parser/ast_nodes.c parser/ast_nodes.h
+	cd symtab && bison -Wno-yacc --debug -d symtab.y 
+
+symtab: flex bison_symtab
+	gcc -o symtab/symtab.out $(CFLAGS) symtab/symtab.tab.c lexer/lex.yy.c symtab/ast_symtab.c
+
+debug_symtab: flex bison_symtab_debug
+	gcc -o symtab/symtab_debug.out $(CFLAGS) -g symtab/symtab.tab.c lexer/lex.yy.c symtab/ast_symtab.c
+
 clean:
-	rm -rf *.h.gch parser/*.out lexer/lex.yy.c parser/parser.tab.* 
+	rm -rf *.h.gch parser/*.out symtab/*.out lexer/lex.yy.c parser/parser.tab.* symtab/symtab.tab.*

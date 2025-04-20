@@ -192,7 +192,7 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
             break;
         case DATA_ARY:
             copy->node = new_ast_ary(
-                (TypedNumber) {.type = TYPE_I, .val = data->node->ary->size},
+                (TypedNumber) {{.i = data->node->ary->size}, TYPE_I},
                 copy_ast_data(data->node->ary->elem, depth-1)
             );
             break;
@@ -227,8 +227,9 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
             break;
         case DATA_ENU:
             copy->node = new_ast_enu(
-                data->node->enu->is_complete
+                data->node->enu->tag
             );
+            copy->node->enu->is_complete = data->node->enu->is_complete; 
             break;
         case DATA_LABEL:
             copy->node = new_ast_label(
@@ -258,7 +259,7 @@ ast_tab_t *copy_params(ast_tab_t *src) {
     return copy;
 }
 
-int comp_set_max(int *src, int *targ, int *warn) {
+int comp_set_max(int *src, int *targ, char *warn) {
     if (*targ && *src && *targ != *src) {
         /*ERROR incompatible types*/
         return -1;
@@ -273,7 +274,7 @@ int comp_set_max(int *src, int *targ, int *warn) {
 
 ast_data_t *comb_ast_data(ast_data_t *src, ast_data_t *targ) {
     char warn; // warn = 1 if by the end, we have implicit conversion
-    ast_data_t *comb, *targ_param, *src_param, *comb_param;
+    ast_data_t *comb, *comb_param;
     ast_sym_t *comb_memb, *src_memb;
     
     warn = 0;
@@ -480,7 +481,6 @@ ast_tab_t *del_ast_tab(ast_tab_t *tab) {
 }
 
 ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type) {
-    int namespace;
     ast_sym_t *sym;
     ast_tab_t *curr;
 
