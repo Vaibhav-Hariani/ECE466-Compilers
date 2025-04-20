@@ -529,6 +529,7 @@ ast_sym_t *lookup(ast_tab_t *tab, char *name, char sym_type) {
 }
 
 int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
+    ast_data_t *comb;
     ast_sym_t *old, *next;
     ast_tab_t *curr_tab;
     int fails;
@@ -541,25 +542,21 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
         old = lookup(tab, sym->name, sym->sym_type);
         if (old != NULL && old->tab == tab) {
             if (replace_dup) {
-                // external refdefinitions? see h&s 4.2.5
-
-                // maybe use merge_types()
-
-                // potentially have to check if types are compatible.
-                // if compatible, we might have to construct
-                // a composite type, which we can do in old by combing
-                // through old and sym and comparing type attributes.
-                // we do this in old because there's already some symbol
-                // in the table pointing to old as the next symbol.
-                
-                // if (/*SOME ERROR*/) {
-                //     fails++;
-                // } else {
-                free(old->filename);
-                old->filename = strdup(sym->filename);
-                old->line = sym->line;
-                del_ast_sym(sym);
-                // }
+                // external redefinitions h&s 4.2.5
+                if ((old->stg_type == STG_EXTERN_EXP || old->stg_type == STG_EXTERN_IMP)
+                && (old->stg_type == STG_EXTERN_EXP || old->stg_type == STG_EXTERN_IMP)
+                && (comb = comb_ast_data(sym->data, old->data)) != NULL) {
+                    del_ast_data(old->data);
+                    old->data = comb;
+                    free(old->filename);
+                    old->filename = strdup(sym->filename);
+                    old->line = sym->line;
+                    del_ast_sym(sym);
+                } else {
+                        /*ERROR conflicting types*/
+                        del_ast_sym(sym);
+                        fails++;
+                }
             } else {
                 // ERROR symbol already defined, cant replace
                 del_ast_sym(sym);
