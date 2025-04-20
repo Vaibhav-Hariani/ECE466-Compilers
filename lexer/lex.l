@@ -1,6 +1,6 @@
 %option noyywrap
 %{
-#include "parser.tab.h"
+#include "symtab.tab.h"
 #include "yylval.h"
 #include <string.h>
 #include <stdlib.h>
@@ -161,10 +161,10 @@ ws			[ \t\r]+
 {decflt}		{number_val('I');			return(NUM);}
 {hexflt}		{number_val('H');			return(NUM);}
 
-{preproc}		{new_filename(); yylloc.line=1;}
-{newline}		{yylloc.line++;}
+{preproc}		{new_filename(); yylloc.first_line=1;}
+{newline}		{yylloc.first_line++;}
 {ws}			{/*empty*/}
-.				{fprintf(stderr, "%s:%d:Error:Unrecognised token %s\n", yylloc.filename, yylloc.line, yytext);}
+.				{fprintf(stderr, "%s:%d:Error:Unrecognised token %s\n", yylloc.filename, yylloc.first_line, yytext);}
 
 %%
 
@@ -235,7 +235,7 @@ int literal_val(char *buf, int is_str) {
 
 					if (num_char > 255) { // restrict overflow
 						fprintf(stderr, "%s:%d:Warning:Hex escape sequence \\x%x out of range\n",
-							yylloc.filename, yylloc.line, num_char);
+							yylloc.filename, yylloc.first_line, num_char);
 						fflush(stderr);
 						num_char = 255;
 					}
@@ -250,7 +250,7 @@ int literal_val(char *buf, int is_str) {
 
 					if (num_char > 255) { // restrict overflow
 						fprintf(stderr, "%s:%d:Warning:Oct escape sequence \\o%o out of range\n",
-							yylloc.filename, yylloc.line, num_char);
+							yylloc.filename, yylloc.first_line, num_char);
 						fflush(stderr);
 						num_char = 255;
 					}
@@ -266,7 +266,7 @@ int literal_val(char *buf, int is_str) {
 	if (char_done && yytext[i] != '\'') {
 		fprintf(stderr,
 			"%s:%d:Warning:Unsupported multibyte character literal truncated to first byte\n",
-			yylloc.filename, yylloc.line);
+			yylloc.filename, yylloc.first_line);
 		fflush(stderr);
 	}
 	return buf_idx;
@@ -298,7 +298,7 @@ void number_val(char type) {
 		if (errno == ERANGE) {/* ERROR */
 			fprintf(stderr,
 				"%s:%d:Warning:Integer constant exceeds valid range\n",
-				yylloc.filename, yylloc.line);
+				yylloc.filename, yylloc.first_line);
 			fflush(stderr);
 		}
 	}	
@@ -313,7 +313,7 @@ void number_val(char type) {
 		if (errno == ERANGE) {/* ERROR */
 			fprintf(stderr,
 				"%s:%d:Warning:Floating constant exceeds valid range\n",
-				yylloc.filename, yylloc.line);
+				yylloc.filename, yylloc.first_line);
 			fflush(stderr);
 		}
 	}

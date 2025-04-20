@@ -539,6 +539,11 @@ int enter(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
         curr_tab = tab;
         next = sym->next;
         sym->next = NULL;
+        if (sym->name == NULL) {
+            sym = next;
+            continue;
+        }
+
         old = lookup(tab, sym->name, sym->sym_type);
         if (old != NULL && old->tab == tab) {
             if (replace_dup) {
@@ -726,8 +731,4 @@ ast_data_t *install_tail(ast_data_t *data, ast_data_t *tail) {
     }
 
     return tail;
-}
-
-ast_data_t *merge_types(ast_data_t *spec, ast_data_t *data) {
-    return NULL;
 }

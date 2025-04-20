@@ -292,10 +292,4 @@ int union_fix(ast_data_t *data);
 // represents the current tail. Returns tail on success.
 ast_data_t *install_tail(ast_data_t *data, ast_data_t *tail);
 
-// may need to be implemented differently altogether.
-// Returns a pointer to the merged type. Guarantees the
-// data pointed to by spec is unchanged (it stays entirely
-// separate from data).
-ast_data_t *merge_types(ast_data_t *spec, ast_data_t *data);
-
 #endif // AST_SYMTAB_H

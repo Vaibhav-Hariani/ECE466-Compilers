@@ -65,7 +65,10 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 
 	#define YYLTYPE YYLTYPE
 	typedef struct YYLTYPE {
-		int line;
+		int first_line;
+		int first_column;
+		int last_line;
+		int last_column;
 		char *filename;
 	} YYLTYPE;
 
@@ -174,9 +177,9 @@ decl_or_stmt:
 ;
 
 declaration:
-	struct_type_spec ';' {$$->node->stru->tag}
-|	union_type_spec ';' {$$->node->unio->tag}
-|	enum_type_spec ';' {$$->node->enu->tag}
+	struct_type_spec ';' {enter(scope_tab, $$ = $1->node->stru->tag, 1);}
+|	union_type_spec ';' {enter(scope_tab, $$ = $1->node->unio->tag, 1);}
+|	enum_type_spec ';' {enter(scope_tab, $$ = $1->node->enu->tag, 1);}
 |	declaration_spec init_declarator_list ';' {
 		int temp;
 		ast_sym_t *curr;
@@ -219,22 +222,22 @@ declaration:
 declaration_spec:
 	stgclass_spec	{
 		$$ = new_ast_sym(NULL, $1, SYM_NONE, NULL,
-			@1.filename, @1.line);
+			@1.filename, @1.first_line);
 		}
 |	type_spec	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE, $1,
-			@1.filename, @1.line);
+			@1.filename, @1.first_line);
 		}
 |	qual_spec	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_NONE, $1, NULL),
-			@1.filename, @1.line);
+			@1.filename, @1.first_line);
 		}
 |	func_spec	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_FUNC,
 			new_ast_data(0, DATA_FUNC, QUAL_NONE, NULL),
-			@1.filename, @1.line);
-		$$.is_inline = 1;
+			@1.filename, @1.first_line);
+		$$->is_inline = 1;
 		}
 |	stgclass_spec declaration_spec {
 		if ($2->stg_type != STG_NONE && $2->stg_type != $1) {
@@ -312,37 +315,47 @@ enum_type_spec:
 enum_type_def:
 	ENUM '{' enum_def_list comma_opt '}' {
 		$$ = new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE,
-			new_ast_enu(NULL));
-		$$->next = $3;
+			new_ast_enu(
+				new_ast_sym(NULL, STG_NONE, SYM_ENU_T, NULL,
+					@1.filename, @1.first_line)));
+		$$->node->enu->tag->data = $$;
+		$$->node->enu->tag->next = $3;
 	}
 |	ENUM IDENT '{' enum_def_list comma_opt '}' {
-		ast_sym_t *tag = new_ast_sym($2, STG_NONE, SYM_ENUM_T,
-				new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE, NULL));
-		tag->data->node->enu->tag = tag; /*this is ridiculous*/
-		$$ = tag->data;
-		$$->next = $4;
+		$$ = new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE,
+			new_ast_enu(
+				new_ast_sym($2, STG_NONE, SYM_ENU_T, NULL,
+					@2.filename, @2.first_line)));
+		$$->node->enu->tag->data = $$;
+		$$->node->enu->tag->next = $4;
 	}
 ;
 
 enum_type_ref:
 	ENUM IDENT	{
-		$$ = lookup(scope_tab, $2, SYM_ENUM_T);
-		if ($$ == NULL) {
+		ast_sym_t *temp = lookup(scope_tab, $2, SYM_ENU_T);
+		if (temp == NULL) {
 			/*no forward references allowed for enums, so:*/
 			/*ERROR*/
+			$$ = NULL;
+		} if (temp->sym_type != SYM_ENU_T) {
+			/*ERROR*/
+			$$ = NULL;
+		} else {
+			$$ = temp->data;
 		}
 	}
 ;
 
 enum_def_list:
 	enum_constant_def	{
-		$$ = new_ast_sym($1, STG_NONE, SYM_ENUM_C, NULL,
-			@1.filename, @1.line);
+		$$ = new_ast_sym($1, STG_NONE, SYM_ENU_C, NULL,
+			@1.filename, @1.first_line);
 		// install into symbol table
 	}
 |	enum_def_list ',' enum_constant_def	{
-		$$ = new_ast_sym($3, STG_NONE, SYM_ENUM_C, NULL,
-			@3.filename, @3.line);
+		$$ = new_ast_sym($3, STG_NONE, SYM_ENU_C, NULL,
+			@3.filename, @3.first_line);
 		$$->next = $1;
 		// install into symbol table
 	}
@@ -371,16 +384,15 @@ int_type_spec:
 ;
 
 signed_type_spec:
-	signed_opt SHORT int_opt	{$$ = new_ast_data(sizeof (short), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_SHORT));}
-|	signed_opt INT	{$$ = new_ast_data(sizeof (int), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_INT));}
+	SHORT int_opt	{$$ = new_ast_data(sizeof (short), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_SHORT));}
+|	INT	{$$ = new_ast_data(sizeof (int), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_INT));}
+|	LONG int_opt	{$$ = new_ast_data(sizeof (long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONG));}
+|	LONG LONG int_opt	{$$ = new_ast_data(sizeof (long long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONGLONG));}
+|	SIGNED SHORT int_opt	{$$ = new_ast_data(sizeof (short), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_SHORT));}
 |	SIGNED	{$$ = new_ast_data(sizeof (int), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_INT));}
-|	signed_opt LONG	int_opt	{$$ = new_ast_data(sizeof (long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONG));}
-|	signed_opt LONG LONG int_opt	{$$ = new_ast_data(sizeof (long long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONGLONG));}
-;
-
-signed_opt:
-	%empty
-|	SIGNED
+|	SIGNED INT	{$$ = new_ast_data(sizeof (int), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_INT));}
+|	SIGNED LONG	int_opt	{$$ = new_ast_data(sizeof (long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONG));}
+|	SIGNED LONG LONG int_opt	{$$ = new_ast_data(sizeof (long long), DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_LONGLONG));}
 ;
 
 unsigned_type_spec:
@@ -412,7 +424,7 @@ struct_type_def:
 		$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
 			new_ast_stru(0,
 				new_ast_sym(NULL, STG_NONE, SYM_STRU_T, NULL,
-					@1.filename, @1.line),
+					@1.filename, @1.first_line),
 				$3));
 		
 		$$->node->stru->tag->data = $$;
@@ -422,17 +434,17 @@ struct_type_def:
 |	STRUCT IDENT '{' field_list '}' {
 		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
 		if (temp != NULL && temp->tab == scope_tab) {
-			if (temp->data->stru->is_complete) {
+			if (temp->data->node->stru->is_complete) {
 				/*ERROR redeclaration not permitted*/
 			} else {
 				$$ = temp->data;
-				$$->data->node->stru->minitab = $4;
+				$$->node->stru->minitab = $4;
 			}
 		} else {
 		$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
 			new_ast_stru(0,
 				new_ast_sym($2, STG_NONE, SYM_STRU_T, NULL,
-					@1.filename, @1.line),
+					@2.filename, @2.first_line),
 				$4));
 			$$->node->stru->tag->data = $$;
 			enter(scope_tab, $$->node->stru->tag, 0);
@@ -445,15 +457,19 @@ struct_type_def:
 
 struct_type_ref:
 	STRUCT IDENT	{
-		$$ = lookup(scope_tab, $2, SYM_STRU_T);
-		if ($$ == NULL) {
+		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
+		if (temp == NULL) {
 			/*install incomplete tag in symbol table*/
-			$$ = new_ast_sym($2, STG_NONE, SYM_STRU_T,
-				new_ast_data(0, DATA_STRU, QUAL_NONE,
-					new_ast_stru(0, NULL, NULL)),
-				@1.filename, @1.line);
-			$$->data->node->stru->tag->$$;
-			enter(scope_tab, $$, 0);
+			$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
+				new_ast_stru(0,
+					new_ast_sym($2, STG_NONE, SYM_STRU_T, NULL,
+						@2.filename, @2.first_line),
+				NULL));
+			$$->node->stru->tag->data = $$;
+			enter(scope_tab, $$->node->stru->tag, 0);
+		} else if ($$->node->stru->tag->sym_type != SYM_STRU_T) {
+			/*ERROR*/
+			$$ = NULL;
 		}
 	}
 ;
@@ -468,7 +484,7 @@ union_type_def:
 		$$ = new_ast_data(0, DATA_UNIO, QUAL_NONE,
 			new_ast_unio(0,
 				new_ast_sym(NULL, STG_NONE, SYM_UNIO_T, NULL,
-					@1.filename, @1.line),
+					@1.filename, @1.first_line),
 				$3));
 		
 		$$->node->unio->tag->data = $$;
@@ -488,36 +504,39 @@ union_type_def:
 		$$ = new_ast_data(0, DATA_UNIO, QUAL_NONE,
 			new_ast_unio(0,
 				new_ast_sym($2, STG_NONE, SYM_UNIO_T, NULL,
-					@1.filename, @1.line),
+					@2.filename, @2.first_line),
 				$4));
 			$$->node->unio->tag->data = $$;
 			enter(scope_tab, $$->node->unio->tag, 0);
 		}
 		
-		unio_fix($$);
+		union_fix($$);
 		$$->node->unio->is_complete = 1;
 	}
 ;
 
 union_type_ref:
 	UNION IDENT	{
-		ast_sym_t *temp = lookup(scope_tab, $2, SYM_UNIO_T);
+		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
 		if (temp == NULL) {
 			/*install incomplete tag in symbol table*/
-			temp = new_ast_sym($2, STG_NONE, SYM_UNIO_T,
-				new_ast_data(0, DATA_UNIO, QUAL_NONE,
-					new_ast_unio(0, NULL, NULL)),
-				@1.filename, @1.line);
-			temp->data->node->unio->tag = temp;
-			enter(scope_tab, temp, 0);
+			$$ = new_ast_data(0, DATA_ENU, QUAL_NONE,
+				new_ast_unio(0,
+					new_ast_sym($2, STG_NONE, SYM_UNIO_T, NULL,
+						@2.filename, @2.first_line),
+				NULL));
+			$$->node->unio->tag->data = $$;
+			enter(scope_tab, $$->node->unio->tag, 0);
+		} else if ($$->node->unio->tag->sym_type != SYM_UNIO_T) {
+			/*ERROR*/
+			$$ = NULL;
 		}
-		$$ = temp->data;
 	}
 ;
 
 field_list:
 	component_declaration {
-		$$ = new_ast_tab(scope_tab, SCOPE_STRUNIO, @1.filename, @1.line);
+		$$ = new_ast_tab(scope_tab, SCOPE_STRUNIO, @1.filename, @1.first_line);
 		enter($$, $1, 0);
 	}
 |	field_list component_declaration {
@@ -606,7 +625,7 @@ qual_spec_list:
 ;
 
 direct_declarator:
-	IDENT	{$$ = new_ast_sym($1, STG_NONE, SYM_NONE, NULL, @1.filename, @1.line);}
+	IDENT	{$$ = new_ast_sym($1, STG_NONE, SYM_NONE, NULL, @1.filename, @1.first_line);}
 |	'(' declarator ')'	{$$ = $2;}
 |	array_declarator	{$$ = $1;}
 |	function_declarator	{$$ = $1;}
@@ -644,7 +663,7 @@ param_type_list:
 
 param_list:
 	param_declaration {
-		$$ = new_ast_tab(scope_tab, SCOPE_FUNC, @1.filename, @1.line);
+		$$ = new_ast_tab(scope_tab, SCOPE_FUNC, @1.filename, @1.first_line);
 		enter($$, $1, 0);
 	}
 |	param_list ',' param_declaration {
@@ -682,7 +701,7 @@ param_declarator:
 abstract_declarator:
 	pointer {
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE, $1,
-			@1.filename, @1.line);
+			@1.filename, @1.first_line);
 	}
 |	pointer direct_abstract_declarator {
 		$2->tail = install_tail($2->tail, $1);
@@ -697,7 +716,7 @@ direct_abstract_declarator:
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_ARY, QUAL_NONE,
 				new_ast_ary($2, NULL)),
-			@1.filename, @1.line);
+			@1.filename, @1.first_line);
 	}
 |	direct_abstract_declarator '[' num_opt ']'  {
 		$1->tail = install_tail($1->tail,
@@ -709,7 +728,7 @@ direct_abstract_declarator:
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_FUNC, QUAL_NONE,
 				new_ast_func(0, NULL, $2)),
-			@1.filename, @1.line);
+			@1.filename, @1.first_line);
 	}
 |	direct_abstract_declarator '(' param_type_list_opt ')' {
 		$1->tail = install_tail($1->tail,
