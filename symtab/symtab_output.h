@@ -1,11 +1,13 @@
 #ifndef SYMTAB_OUTPUT_H
 #define SYMTAB_OUTPUT_H
 
-#include "ast_symtab.h"
+#include "symbol.h"
+#include "table.h"
+#include "data.h"
 
 // Prints storage class and data type information of
-// all parameters stored in the misc namespace of tab.
-int print_params(ast_tab_t *tab, int num_tabs);
+// all parameters stored in params list.
+int print_params(ast_sym_t *params, int num_tabs);
 
 // Prints the data type information stored in data,
 // including nested type information.

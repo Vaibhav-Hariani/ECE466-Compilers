@@ -25,8 +25,10 @@ int print_qual(char qual) {
 }
 
 int print_scal(char unsign, char scal_type) {
-    if (unsign) {
+    if (unsign == 1) {
         printf("unsigned ");
+    } else if (unsign == -1) { // signed char
+        printf("signed ");
     }
     switch (scal_type) {
         // we like to have a little bit of fun around here
@@ -64,6 +66,7 @@ int print_scope(int scope_type, char *filename, int line) {
             printf("global ");
             break;
         case SCOPE_FUNC:
+        case SCOPE_VUNC:
             printf("function ");
             break;
         case SCOPE_BLOCK:
@@ -110,22 +113,26 @@ int print_stg(int stg_type) {
     return 0;
 }
 
-int print_params(ast_tab_t *tab, int num_tabs) {
+int print_params(ast_sym_t *params, int num_tabs) {
     ast_sym_t *curr;
 
-    curr = tab->misc;
-    while (curr != NULL) {
-        print_indent(num_tabs);
-        printf("parameter %s {\n", curr->name);
-        print_indent(num_tabs + 1);
-        printf("stg class: \t");
-        print_stg(curr->stg_type);
-        print_indent(num_tabs + 1);
-        printf("data type:\n");
-        print_data(curr->data, num_tabs+2);
-        print_indent(num_tabs);
-        printf("}\n");
+    if (params == NULL) {
+        return 0;
     }
+
+    print_params(params->prev, num_tabs);
+
+    print_indent(num_tabs);
+    printf("parameter %s {\n", curr->name);
+    print_indent(num_tabs + 1);
+    printf("stg class: \t");
+    print_stg(curr->stg_type);
+    print_indent(num_tabs + 1);
+    printf("data type:\n");
+    print_data(curr->data, num_tabs+2);
+    print_indent(num_tabs);
+    printf("}\n");
+
     return 0;
 }
 
@@ -171,7 +178,7 @@ int print_data(ast_data_t *data, int num_tabs) {
             if (data->node->stru->is_complete) {
                 printf("(defined at <%s>:%d)\n",
                     data->node->stru->tag->filename,
-                    data->node->stru->tag->line);
+                    data->node->stru->tag->start);
             } else {
                 printf("(incomplete)\n");
             }
@@ -185,7 +192,7 @@ int print_data(ast_data_t *data, int num_tabs) {
             if (data->node->unio->is_complete) {
                 printf("(defined at <%s>:%d)\n",
                     data->node->unio->tag->filename,
-                    data->node->unio->tag->line);
+                    data->node->unio->tag->start);
             } else {
                 printf("(incomplete)\n");
             }
@@ -198,7 +205,7 @@ int print_data(ast_data_t *data, int num_tabs) {
             }
             printf("(defined at <%s>:%d)\n",
                     data->node->unio->tag->filename,
-                    data->node->unio->tag->line);
+                    data->node->unio->tag->start);
             break;
         case DATA_LABEL:
             printf("label");
@@ -208,12 +215,18 @@ int print_data(ast_data_t *data, int num_tabs) {
 }
 
 int print_memb_decl(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_name) {
+    if (memb == NULL) {
+        return 0;
+    }
+
+    print_memb_decl(memb->prev, sym, num_tabs, data_name);
+
     print_indent(num_tabs);
     printf("%s %s field %s defined at <%s>:%d {\n",
-        data_name, sym->name, memb->name, memb->filename, memb->line);
+        data_name, sym->name, memb->name, memb->filename, memb->start);
     print_indent(num_tabs + 1);
     printf("scope: ");
-    print_scope(memb->tab->scope_type, memb->tab->filename, memb->tab->line);
+    print_scope(memb->sco_type, memb->filename, memb->start);
     print_indent(num_tabs + 1);
     printf("data type:\n");
     print_data(memb->data, num_tabs + 2);
@@ -226,10 +239,10 @@ int print_sym_decl(ast_sym_t *sym, int num_tabs) {
     print_indent(num_tabs);
     printf("%s %s defined at <%s>:%d {\n",
         (sym->sym_type == SYM_VAR)? "variable" : "function",
-        sym->name, sym->filename, sym->line);
+        sym->name, sym->filename, sym->start);
     print_indent(num_tabs + 1);
     printf("scope:     \t");
-    print_scope(sym->tab->scope_type, sym->tab->filename, sym->tab->line);
+    print_scope(sym->sco_type, sym->filename, sym->start);
     print_indent(num_tabs + 1);
     printf("stg class: \t");
     print_stg(sym->stg_type);
@@ -243,32 +256,31 @@ int print_sym_decl(ast_sym_t *sym, int num_tabs) {
 
 int print_obj_def(ast_sym_t *sym, int num_tabs) {
     char *data_name;
-    ast_sym_t *memb;
+    ast_sym_t *membs;
 
-    memb = NULL;
+    membs = NULL;
     data_name = NULL;
     switch (sym->sym_type) {
         case SYM_STRU_T:
             data_name = strdup("struct");
-            memb = sym->data->node->stru->minitab->memb;
+            membs = sym->data->node->stru->membs;
             break;
         case SYM_UNIO_T:
             data_name = strdup("union");
-            memb = sym->data->node->unio->minitab->memb;
+            membs = sym->data->node->unio->membs;
             break;
     }
     
     print_indent(num_tabs);
     printf("%s %s defined at <%s>:%d {\n",
-        data_name, sym->name, sym->filename, sym->line);
+        data_name, sym->name, sym->filename, sym->start);
     print_indent(num_tabs + 1);
     printf("scope: ");
-    print_scope(sym->tab->scope_type, sym->tab->filename, sym->tab->line);
+    print_scope(sym->sco_type, sym->filename, sym->start);
     
-    while (memb != NULL) {
-        print_memb_decl(memb, sym, num_tabs + 1, data_name);
-        memb = memb->next;
-    }
+    print_memb_decl(membs, sym, num_tabs + 1, data_name);
+
+    free(data_name);
     print_indent(num_tabs);
     printf("}\n\n");
 

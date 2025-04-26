@@ -74,7 +74,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 }
 
 %code {
-	ast_tab_t *scope_tab = NULL;
+	ast_tab_t *tab = NULL;
 }
 
 %define api.location.type {YYLTYPE}
@@ -115,7 +115,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 //unops take in an lvalue, and do one of 3 operations to them.
 
 prog:
-	%empty {scope_tab = new_ast_tab(NULL, SCOPE_FILE, strdup("yyin"), 1); $$ = NULL;}
+	%empty {scope_tab = init_table(unsigned int min_size); $$ = NULL;}
 |	declaration_or_fndef	{
 		if ($1->sym_type == SYM_VAR || $1->sym_type == SYM_FUNC) {
 			print_sym_decl($1, 0);
