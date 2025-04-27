@@ -60,25 +60,25 @@ int print_scal(char unsign, char scal_type) {
     return 0;
 }
 
-int print_scope(int scope_type, char *filename, int line) {
-    switch (scope_type) {
-        case SCOPE_FILE:
+int print_scope(int sco_type, char *filename, int line) {
+    switch (sco_type) {
+        case SCO_FILE:
             printf("global ");
             break;
-        case SCOPE_FUNC:
-        case SCOPE_VUNC:
+        case SCO_FUNC:
+        case SCO_VUNC:
             printf("function ");
             break;
-        case SCOPE_BLOCK:
+        case SCO_BLOCK:
             printf("block ");
             break;
-        case SCOPE_PROTO:
+        case SCO_PROTO:
             printf("prototype ");
             break;
-        case SCOPE_STRUNIO:
+        case SCO_STRUNIO:
             printf("struct/union ");
             break;
-        case SCOPE_ENU:
+        case SCO_ENU:
             printf("enum ");
             break;
     }

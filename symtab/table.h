@@ -35,8 +35,9 @@ ast_tab_t *new_table(unsigned int min_size);
 // otherwise, such a symbol is replaced if replacement is
 // permissible. Returns 0 on success, 1 if a symbol in the
 // same namespace and scope already exists in the table, 2
-// if rehash fails.
-int insert(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
+// if rehash fails. Sets the end of sym's scope to end and
+// its scope types to sco_type.
+int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup);
 
 // Insert list of symbols (the last of which is pointed to
 // by sym) into tab. If replace_dup is 0, an error
@@ -44,7 +45,9 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
 // exists; otherwise, such a symbol is replaced if
 // replacement is permissible. Returns the number of symbols
 // not entered into a table (0 if all successfully entered).
-int insert_list(ast_tab_t *tab, ast_sym_t *sym, char replace_dup);
+// Sets the end of each symbol's scope to end and their
+// scope types to sco_type.
+int insert_list(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup);
 
 // Returns true if a symbol with the specified key (name),
 // namespace and whose scope contains start and end is in

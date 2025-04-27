@@ -1,20 +1,18 @@
 #include "symbol.h"
 #include "symtab.tab.h"
 
-ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type, char sco_type,
-    ast_data_t *data, char *filename, int start, int end){
+ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
+    ast_data_t *data, char *filename, int start){
     ast_sym_t *sym;
 
     sym = calloc(1, sizeof(ast_sym_t));
     sym->name = name;
     sym->stg_type = stg_type;
     sym->sym_type = sym_type;
-    sym->sco_type = sco_type;
     sym->data = data;
     sym->tail = data;
     sym->filename = filename;
     sym->start = start;
-    sym->end = end;
     return sym;
 }
 
@@ -30,6 +28,19 @@ ast_sym_t *del_ast_sym(ast_sym_t *sym) {
     return prev;
 }
 
+ast_sym_t *list_start(ast_sym_t *sym) {
+    while (sym->prev != NULL) {
+        sym = sym->prev;
+    }
+    return sym;
+}
+
+int del_sym_list(ast_sym_t *sym) {
+    while (sym != NULL) {
+        sym = del_ast_sym(sym);
+    }
+    return 0;
+}
 
 int get_align(ast_sym_t *memb, ast_sym_t *sym) {
     int align, temp;
@@ -99,7 +110,7 @@ int struct_fix_memb(ast_data_t *data, ast_sym_t *memb) {
 
     max_align = struct_fix_memb(memb->prev, data->node->stru->tag);
     align = get_align(memb, data->node->stru->tag);
-    if (align >= max_align) {
+    if (align > max_align) {
         max_align = align;
     }
 
@@ -127,7 +138,7 @@ int union_fix_memb(ast_data_t *data, ast_sym_t *memb) {
 
     union_fix_memb(memb->prev, data->node->stru->tag);
     align = get_align(memb, data->node->stru->tag);
-    if (align >= data->size) {
+    if (align > data->size) {
         data->size = align;
     }
     return 0;
@@ -137,18 +148,27 @@ int union_fix(ast_data_t *data) {
     return union_fix_memb(data, data->node->unio->membs);
 }
 
-ast_data_t *install_tail(ast_data_t *data, ast_data_t *tail) {
-    switch (data->data_type) {
+ast_data_t *install_tail(ast_sym_t *sym, ast_data_t *tail) {
+    if (sym->tail == NULL) {
+        sym->data = tail;
+        sym->tail = tail;
+        return tail;
+    }
+
+    switch (sym->tail->data_type) {
         case DATA_PTR:
-            data->node->ptr->to = tail;
+            sym->tail->node->ptr->to = tail;
+            sym->tail->size = sizeof (void *);
             break;
         case DATA_ARY:
-            data->node->ary->elem = tail;
+            sym->tail->node->ary->elem = tail;
+            sym->tail->size = tail->size * sym->tail->node->ary->size;
             break;
         case DATA_FUNC:
-            data->node->func->ret = tail;
+            sym->tail->node->func->ret = tail;
             break;
     }
 
+    sym->tail = tail;
     return tail;
 }

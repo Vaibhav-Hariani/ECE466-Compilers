@@ -38,15 +38,15 @@ enum sym_type {
     SYM_LABEL
 };
 
-enum scope_type {
-    SCOPE_NONE = 0,
-    SCOPE_FILE,
-    SCOPE_FUNC,
-    SCOPE_VUNC,
-    SCOPE_BLOCK,
-    SCOPE_PROTO,
-    SCOPE_STRUNIO,
-    SCOPE_ENU
+enum sco_type {
+    SCO_NONE = 0,
+    SCO_FILE,
+    SCO_FUNC,
+    SCO_VUNC,
+    SCO_BLOCK,
+    SCO_PROTO,
+    SCO_STRUNIO,
+    SCO_ENU
 };
 
 // Each symbol contains a pointer to the
@@ -76,13 +76,19 @@ typedef struct ast_sym {
 // data type and filename are dynamically allocated and uses
 // their same addresses.
 ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
-    char sco_type, ast_data_t *data, char *filename,
-    int start, int end);
+    ast_data_t *data, char *filename, int start);
 
-// Destroys symbol table entry pointed to by sym and all
-// storage it consumes. Returns a pointer to the next
-// symbol in the table.
+// Destroys symbol pointed to by sym and all storage it
+// consumes. Returns a pointer to the previous symbol in the
+// list.
 ast_sym_t *del_ast_sym(ast_sym_t *sym);
+
+// Returns the first symbol in a list of symbols.
+ast_sym_t *list_start(ast_sym_t *sym);
+
+// Destroys all symbols in the symbol list pointed to by sym
+// and all storage they consume.
+int del_sym_list(ast_sym_t *sym);
 
 // Sets the size of a struct data type whose members are
 // stored in the struct's symbol table. Pads the struct such
@@ -99,8 +105,9 @@ int struct_fix(ast_data_t *data);
 // unions of its own type, nested definitions.
 int union_fix(ast_data_t *data);
 
-// Installs tail at the reasonable spot in data, which
+// Installs tail at the reasonable spot in sym's tail, which
 // represents the current tail. Returns tail on success.
-ast_data_t *install_tail(ast_data_t *data, ast_data_t *tail);
+// Sets data and tail if currently NULL in sym.
+ast_data_t *install_tail(ast_sym_t *sym, ast_data_t *tail);
 
 #endif // SYMBOL_H

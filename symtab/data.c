@@ -241,16 +241,19 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
 ast_sym_t *copy_params(ast_sym_t *src) {
     ast_sym_t *copy, *curr;
 
-    copy = NULL;
-    while (src != NULL) {
-        curr = new_ast_sym(strdup(src->name), src->stg_type, src->sym_type, src->sco_type,
-            src->data, strdup(src->filename), src->start, src->end);
-        
-        if (copy == NULL) {
-            copy = curr;
-        }
-        curr = curr->prev;
+    curr = new_ast_sym(strdup(src->name), src->stg_type, src->sym_type,
+        src->data, strdup(src->filename), src->start);
+    curr->sco_type = src->sco_type;
+    curr->end = src->end;
+    copy = curr;
+
+    while (src->prev != NULL) {
         src = src->prev;
+        curr->prev = new_ast_sym(strdup(src->name), src->stg_type, src->sym_type,
+            src->data, strdup(src->filename), src->start);
+        curr = curr->prev;
+        curr->sco_type = src->sco_type;
+        curr->end = src->end;
     }
 
     return copy;
@@ -310,6 +313,13 @@ ast_data_t *comb_ast_data(ast_data_t *src, ast_data_t *targ) {
             }
             break;
         case DATA_FUNC: // h&s 5.11.4, prototype forms only
+            
+            if (comb->node->func->is_complete == 1) {
+                /*ERROR function already defined*/
+                del_ast_sym(comb);
+                return NULL;
+            }
+
             if (src->data_type != DATA_FUNC
             || comb->node->func->is_variadic != src->node->func->is_variadic
             || (comb->node->func->ret = comb_ast_data(src->node->func->ret, comb->node->func->ret)) == NULL) {

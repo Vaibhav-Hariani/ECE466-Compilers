@@ -31,7 +31,7 @@ ast_tab_t *new_table(unsigned int min_size) {
     return tab;
 }
 
-int insert(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
+int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup) {
     int i;
     ast_data_t *comb;
     ast_sym_t *old;
@@ -42,11 +42,14 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
         }
     }
 
+    sym->sco_type = sco_type; // symbol's scope
+    sym->end = end; // end of the symbol's scope
+
     i = hash(tab, sym, get_namespace(sym->sym_type));
     while (tab->cells[i] != NULL) {
         if (!strcmp(sym->name, tab->cells[i]->sym->name)
         && get_namespace(tab->cells[i]->sym->sym_type) == get_namespace(sym->sym_type)
-        && sym->end != tab->cells[i]->sym->end) {
+        && sym->end == tab->cells[i]->sym->end) {
             if (replace_dup) {
                 // external redefinitions h&s 4.2.5
                 if ((tab->cells[i]->sym->stg_type == STG_EXTERN_EXP ||
@@ -75,18 +78,40 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
     tab->cells[i] = calloc(1, sizeof (ast_cell_t));
     tab->cells[i]->sym = sym;
     tab->filled++;
+
+    // output
+    switch (sym->sym_type) {
+        case SYM_VAR:
+            print_sym_decl(sym, 0);
+            break;
+        case SYM_FUNC:
+            if (sym->data->node->func->is_complete) {
+                print_sym_decl(sym, 0);
+            }
+        case SYM_STRU_T:
+            if (sym->data->node->stru->is_complete) {
+                print_obj_def(sym, 0);
+            }
+            break;
+        case SYM_UNIO_T:
+            if (sym->data->node->unio->is_complete) {
+                print_obj_def(sym, 0);
+            }
+            break;
+    }
+
     return 0;
 }
 
-int insert_list(ast_tab_t *tab, ast_sym_t *sym, char replace_dup) {
+int insert_list(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup) {
     int fails;
 
     if (sym == NULL) {
         return 0;
     }
 
-    fails = insert(tab, sym->prev, replace_dup);
-    fails += (insert(tab, sym, replace_dup) != 0);
+    fails = insert(tab, sym->prev, sco_type, end, replace_dup);
+    fails += (insert(tab, sym, sco_type, end, replace_dup) != 0);
 
     return fails;
 }
@@ -189,7 +214,7 @@ unsigned int locate(ast_tab_t *tab, char *key, char namespace, int start, int en
     ret = -1;
     i = hash(key, tab->size, namespace);
     while (tab->cells[i] != NULL) {
-        if (!strcmp(key, tab->cells[i]->sym->name)    // same key
+        if (!strcmp(key, tab->cells[i]->sym->name)  // same key
         && get_namespace(tab->cells[i]->sym->sym_type) == namespace // same namespace
         && tab->cells[i]->sym->start <= start   // scope is or contains the scope
         && tab->cells[i]->sym->end >= end) {    // specified by start and end
@@ -245,7 +270,7 @@ int rehash(ast_tab_t *tab) {
 
     for (i = 0; i < old_size; i++) {
         if (old_cells[i] != NULL) {
-            insert(tab, old_cells[i], 0);
+            insert(tab, old_cells[i], old_cells[i]->sym->end, old_cells[i]->sym->sco_type, 0);
             // insert from old_cells to tab->cells
         }
     }
