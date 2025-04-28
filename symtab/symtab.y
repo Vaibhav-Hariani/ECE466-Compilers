@@ -84,9 +84,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <c> stgclass_spec qual_spec qual_spec_list;
 %nterm <n> num_opt;
 %nterm <data> type_spec;
-%nterm <data> enum_type_spec;
-%nterm <data> struct_type_spec struct_type_def struct_type_ref;
-%nterm <data> union_type_spec union_type_def union_type_ref;
+%nterm <data> struct_type_spec union_type_spec enum_type_spec;
 %nterm <data> float_type_spec int_type_spec;
 %nterm <data> signed_type_spec unsigned_type_spec char_type_spec;
 %nterm <data> pointer;
@@ -95,6 +93,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <sym> compound_statement decl_or_stmt decl_or_stmt_list statement
 %nterm <sym> declaration declaration_spec untyped_declaration_spec param_declaration;
 %nterm <sym> init_declarator init_declarator_list;
+%nterm <sym> struct_type_def struct_type_ref union_type_def union_type_ref
 %nterm <sym> enum_type_def enum_type_ref enum_def_list;
 %nterm <sym> component_declaration component_declarator component_declarator_list;
 %nterm <sym> declarator declarator_list;
@@ -135,7 +134,7 @@ declaration_or_fndef:
 				break;
 		}
 
-		if (!insert(tab, $1, SCO_FILE, __INT_MAX__, 1)) {
+		if (!insert_list(tab, $1, SCO_FILE, __INT_MAX__, 1)) {
 			$$ = $1;
 		} else {
 			$$ = NULL;
@@ -227,13 +226,12 @@ statement:
 ;
 
 declaration:
-	struct_type_spec ';' {$$ = $1->node->stru->tag;}
-|	union_type_spec ';' {$$ = $1->node->unio->tag;}
-|	enum_type_def ';' {$$ = $1->node->enu->tag;}
-|	enum_type_ref ';' {
-	
-		$$ = $1->node->enu->tag;
-	}
+	struct_type_def ';' {$$ = $1;}
+|	struct_type_ref ';' {$$ = $1;}
+|	union_type_def ';' {$$ = $1;}
+|	union_type_ref ';' {$$ = $1;}
+|	enum_type_def ';' {$$ = $1;}
+|	enum_type_ref ';' {$$ = $1;}
 |	declaration_spec init_declarator_list ';' {
 		ast_sym_t *curr;
 
