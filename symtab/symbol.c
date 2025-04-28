@@ -119,6 +119,24 @@ int struct_fix_memb(ast_data_t *data, ast_sym_t *memb) {
     return max_align;
 }
 
+ast_sym_t *resolve_tag(ast_sym_t *tab, ast_sym_t *sym) {
+    ast_sym_t *tag;
+
+    tag = get_sym(tab, sym->tail->node->sue->name, NS_TAG, sym->start, sym->end);
+    if (tag != NULL && tag->data->data_type == sym->data->node->sue->data_type) {
+        sym->tail->data_type = tag->data->data_type;
+        sym->tail->size = tag->data->size;
+
+        free(sym->tail->node->sue->name);
+        free(sym->tail->node->sue);
+        free(sym->tail->node);
+
+        sym->tail->node = tag->data->node;
+        return tag;
+    }
+    return NULL;
+}
+
 int struct_fix(ast_data_t *data) {
     int max_align;
 

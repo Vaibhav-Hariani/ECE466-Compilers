@@ -34,7 +34,7 @@ ast_tab_t *new_table(unsigned int min_size) {
 int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup) {
     int i;
     ast_data_t *comb;
-    ast_sym_t *old;
+    ast_sym_t *old, *tag;
 
     if (tab->filled * 2 >= tab->size) {
         if (rehash(tab) == -1) {
@@ -45,11 +45,62 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
     sym->sco_type = sco_type; // symbol's scope
     sym->end = end; // end of the symbol's scope
 
+    // resolves placeholder struct/union/enum tags,
+    // inserts incomplete symbol into table if need be
+    if (sym->tail->data_type == DATA_SUE
+    && sym->tail->node->sue->name != NULL) {
+
+        // insert new incomplete type if struct/union/enum tag not resolved
+        if (resolve_tag(tab, sym) == NULL) {
+            switch (sym->tail->node->sue->data_type) {
+                case DATA_STRU:
+                    tag = new_ast_sym(sym->tail->node->sue->name, STG_NA, SYM_STRU_T, 
+                        new_ast_data(0, DATA_STRU, QUAL_NONE,
+                            new_ast_stru(0, NULL, NULL)),
+                        sym->filename, end);
+                    tag->data->node->stru->tag = tag;
+                    break;
+                case DATA_UNIO:
+                    tag = new_ast_sym(sym->tail->node->sue->name, STG_NA, SYM_UNIO_T, 
+                        new_ast_data(0, DATA_UNIO, QUAL_NONE,
+                            new_ast_unio(0, NULL, NULL)),
+                        sym->filename, end);
+                    tag->data->node->unio->tag = tag;
+                    break;
+                case DATA_ENU:
+                    tag = new_ast_sym(sym->tail->node->sue->name, STG_NA, SYM_ENU_T, 
+                        new_ast_data(0, DATA_ENU, QUAL_NONE,
+                            new_ast_enu(0, NULL)),
+                        sym->filename, end);
+                    tag->data->node->enu->tag = tag;
+                    break;
+            }
+            insert(tab, tag, sco_type, end, replace_dup);
+        }
+    }
+
     i = hash(tab, sym, get_namespace(sym->sym_type));
     while (tab->cells[i] != NULL) {
         if (!strcmp(sym->name, tab->cells[i]->sym->name)
         && get_namespace(tab->cells[i]->sym->sym_type) == get_namespace(sym->sym_type)
         && sym->end == tab->cells[i]->sym->end) {
+            
+            // sym is a definition for an incomplete struct/union/enum
+            if ((tab->cells[i]->sym->sym_type == SYM_STRU_T
+                && sym->sym_type == SYM_STRU_T
+                && tab->cells[i]->sym->data->node->stru->is_complete == 0)
+            ||  (tab->cells[i]->sym->sym_type == SYM_UNIO_T
+                && sym->sym_type == SYM_UNIO_T
+                && tab->cells[i]->sym->data->node->unio->is_complete == 0)
+            ||  (tab->cells[i]->sym->sym_type == SYM_ENU_T
+                && sym->sym_type == SYM_ENU_T
+                && tab->cells[i]->sym->data->node->enu->is_complete == 0)) {
+                del_ast_sym(tab->cells[i]->sym);
+                tab->cells[i]->sym = sym;
+                print_obj_def(sym, 0);
+                return 0;
+            }
+
             if (replace_dup) {
                 // external redefinitions h&s 4.2.5
                 if ((tab->cells[i]->sym->stg_type == STG_EXTERN_EXP ||

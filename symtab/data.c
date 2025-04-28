@@ -70,6 +70,19 @@ union ast_type *new_ast_param(ast_data_t *is){
     return node;
 }
 
+union ast_type *new_ast_sue(char data_type, char *name){
+    struct ast_sue *sue;
+    union ast_type *node;
+
+    sue = calloc(1, sizeof(struct ast_sue));
+    sue->data_type = data_type;
+    sue->name = name;
+
+    node = calloc(1, sizeof (union ast_type));
+    node->sue = sue;
+    return node;
+}
+
 union ast_type *new_ast_stru(char is_complete, ast_sym_t *tag, ast_sym_t *membs){
     struct ast_stru *stru;
     union ast_type *node;
@@ -98,11 +111,12 @@ union ast_type *new_ast_unio(char is_complete, ast_sym_t *tag, ast_sym_t *membs)
     return node;
 }
 
-union ast_type *new_ast_enu(ast_sym_t *tag){
+union ast_type *new_ast_enu(char is_complete, ast_sym_t *tag){
     struct ast_enu *enu;
     union ast_type *node;
  
     enu = calloc(1, sizeof(struct ast_enu));
+    enu->is_complete = is_complete;
     enu->tag = tag;
 
     node = calloc(1, sizeof (union ast_type));
@@ -146,6 +160,9 @@ ast_data_t *new_ast_data(int size, char data_type, char qual, union ast_type *no
         case DATA_PARAM:
             data->node->param = node->param;
             break;
+        case DATA_SUE:
+            data->node->sue = node->sue;
+            break;
         case DATA_STRU:
             data->node->stru = node->stru;
             break;
@@ -183,27 +200,28 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
             break;
         case DATA_PTR:
             copy->node = new_ast_ptr(
-                copy_ast_data(data->node->ptr->to, depth-1)
-            );
+                copy_ast_data(data->node->ptr->to, depth-1));
             break;
         case DATA_ARY:
             copy->node = new_ast_ary(
                 (TypedNumber) {{.i = data->node->ary->size}, TYPE_I},
-                copy_ast_data(data->node->ary->elem, depth-1)
-            );
+                copy_ast_data(data->node->ary->elem, depth-1));
             break;
         case DATA_FUNC:
             copy->node = new_ast_func(
                 data->node->func->is_complete,
                 data->node->func->is_variadic,
                 copy_ast_data(data->node->func->ret, depth-1),
-                copy_params(data->node->func->params)
-            );
+                copy_params(data->node->func->params));
             break;
         case DATA_PARAM:
             copy->node = new_ast_param(
-                copy_ast_data(data->node->param->is, depth-1)
-            );
+                copy_ast_data(data->node->param->is, depth-1));
+            break;
+        case DATA_SUE:
+            copy->node = new_ast_sue(
+                data->node->sue->data_type,
+                strdup(data->node->sue->name));
             break;
         case DATA_STRU:
             // tag intentionally not deep-copied
@@ -211,27 +229,23 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
             copy->node = new_ast_stru(
                 data->node->stru->is_complete,
                 data->node->stru->tag,
-                data->node->stru->membs
-            );
+                data->node->stru->membs);
             break;
         case DATA_UNIO:
             // same as above
             copy->node = new_ast_unio(
                 data->node->unio->is_complete,
                 data->node->unio->tag,
-                data->node->unio->membs
-            );
+                data->node->unio->membs);
             break;
         case DATA_ENU:
             copy->node = new_ast_enu(
-                data->node->enu->tag
-            );
-            copy->node->enu->is_complete = data->node->enu->is_complete; 
+                data->node->enu->is_complete,
+                data->node->enu->tag);
             break;
         case DATA_LABEL:
             copy->node = new_ast_label(
-                data->node->label->is_complete
-            );
+                data->node->label->is_complete);
             break;
     }
 
@@ -401,6 +415,8 @@ int del_ast_data(ast_data_t *data) {
             del_ast_data(data->node->func->ret);
             syms = data->node->func->params;
             break;
+        case DATA_SUE:
+            free(data->node->sue->name);
         case DATA_STRU:
             syms = data->node->stru->membs;
             break;

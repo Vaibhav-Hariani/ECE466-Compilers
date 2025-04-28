@@ -10,6 +10,7 @@ enum data_type {
     DATA_ARY,
     DATA_FUNC,
     DATA_PARAM,
+    DATA_SUE,
     DATA_STRU,
     DATA_UNIO,
     DATA_ENU,
@@ -45,6 +46,7 @@ union ast_type {
     struct ast_ary *ary;
     struct ast_func *func;
     struct ast_param *param;
+    struct ast_sue *sue;
     struct ast_stru *stru;
     struct ast_unio *unio;
     struct ast_enu *enu;
@@ -87,6 +89,11 @@ struct ast_func {
     ast_sym_t *params;
 };
 
+struct ast_sue {
+    char data_type;
+    char *name;
+};
+
 struct ast_stru {
     char is_complete;
     ast_sym_t *tag;
@@ -114,9 +121,10 @@ union ast_type *new_ast_ptr(ast_data_t *to);
 union ast_type *new_ast_ary(TypedNumber size, ast_data_t *elem);
 union ast_type *new_ast_param(ast_data_t *is);
 union ast_type *new_ast_func(char is_complete, char is_variadic, ast_data_t *ret, ast_sym_t *params);
+union ast_type *new_ast_sue(char data_type, char *name);
 union ast_type *new_ast_stru(char is_complete, ast_sym_t *tag, ast_sym_t *memb);
 union ast_type *new_ast_unio(char is_complete, ast_sym_t *tag, ast_sym_t *memb);
-union ast_type *new_ast_enu(ast_sym_t *tag);
+union ast_type *new_ast_enu(char is_complete, ast_sym_t *tag);
 union ast_type *new_ast_label(char is_complete);
 
 // Creates ast_data_t object with specified type, qualifiers

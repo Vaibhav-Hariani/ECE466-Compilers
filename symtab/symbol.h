@@ -90,6 +90,13 @@ ast_sym_t *list_start(ast_sym_t *sym);
 // and all storage they consume.
 int del_sym_list(ast_sym_t *sym);
 
+// When passed a symbol whose tail data type is sue (struct/
+// union/enum placeholder), attempts to find the respective
+// struct/union/enum with the same tag name in the closest
+// scope and replaces the tail with that type. Returns NULL
+// if no suitable struct/union/enum type is found.
+ast_sym_t *resolve_tag(ast_sym_t *tab, ast_sym_t *sym);
+
 // Sets the size of a struct data type whose members are
 // stored in the struct's symbol table. Pads the struct such
 // that all members would meet their respective alignment
