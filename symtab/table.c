@@ -45,6 +45,11 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
     sym->sco_type = sco_type; // symbol's scope
     sym->end = end; // end of the symbol's scope
 
+    // filters out anonymous struct/union/enums
+    if (get_namespace(sym->sym_type) == NS_TAG && sym->name == NULL) {
+        return 0;
+    }
+
     // resolves placeholder struct/union/enum tags,
     // inserts incomplete symbol into table if need be
     if (sym->tail->data_type == DATA_SUE

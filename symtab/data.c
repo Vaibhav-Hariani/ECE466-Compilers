@@ -212,7 +212,7 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
                 data->node->func->is_complete,
                 data->node->func->is_variadic,
                 copy_ast_data(data->node->func->ret, depth-1),
-                copy_params(data->node->func->params));
+                copy_sym_list(data->node->func->params));
             break;
         case DATA_PARAM:
             copy->node = new_ast_param(
@@ -224,19 +224,16 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
                 strdup(data->node->sue->name));
             break;
         case DATA_STRU:
-            // tag intentionally not deep-copied
-            // tab should be but isnt (would be important for flexible arrays)
             copy->node = new_ast_stru(
                 data->node->stru->is_complete,
                 data->node->stru->tag,
-                data->node->stru->membs);
+                copy_sym_list(data->node->stru->membs));
             break;
         case DATA_UNIO:
-            // same as above
             copy->node = new_ast_unio(
                 data->node->unio->is_complete,
                 data->node->unio->tag,
-                data->node->unio->membs);
+                copy_sym_list(data->node->unio->membs));
             break;
         case DATA_ENU:
             copy->node = new_ast_enu(
@@ -247,27 +244,6 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
             copy->node = new_ast_label(
                 data->node->label->is_complete);
             break;
-    }
-
-    return copy;
-}
-
-ast_sym_t *copy_params(ast_sym_t *src) {
-    ast_sym_t *copy, *curr;
-
-    curr = new_ast_sym(strdup(src->name), src->stg_type, src->sym_type,
-        src->data, strdup(src->filename), src->start);
-    curr->sco_type = src->sco_type;
-    curr->end = src->end;
-    copy = curr;
-
-    while (src->prev != NULL) {
-        src = src->prev;
-        curr->prev = new_ast_sym(strdup(src->name), src->stg_type, src->sym_type,
-            src->data, strdup(src->filename), src->start);
-        curr = curr->prev;
-        curr->sco_type = src->sco_type;
-        curr->end = src->end;
     }
 
     return copy;

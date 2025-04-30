@@ -83,8 +83,6 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <i> enum_constant_def;
 %nterm <c> stgclass_spec qual_spec qual_spec_list;
 %nterm <n> num_opt;
-%nterm <data> type_spec;
-%nterm <data> struct_type_spec union_type_spec enum_type_spec;
 %nterm <data> float_type_spec int_type_spec;
 %nterm <data> signed_type_spec unsigned_type_spec char_type_spec;
 %nterm <data> pointer;
@@ -93,8 +91,10 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <sym> compound_statement decl_or_stmt decl_or_stmt_list statement
 %nterm <sym> declaration declaration_spec untyped_declaration_spec param_declaration;
 %nterm <sym> init_declarator init_declarator_list;
-%nterm <sym> struct_type_def struct_type_ref union_type_def union_type_ref
-%nterm <sym> enum_type_def enum_type_ref enum_def_list;
+%nterm <sym> type_spec;
+%nterm <sym> enum_type_spec enum_type_def enum_type_ref enum_def_list;
+%nterm <sym> struct_type_spec struct_type_def struct_type_ref;
+%nterm <sym> union_type_spec union_type_def union_type_ref
 %nterm <sym> component_declaration component_declarator component_declarator_list;
 %nterm <sym> declarator declarator_list;
 %nterm <sym> direct_declarator array_declarator function_declarator;
@@ -173,6 +173,9 @@ function_def: /*does not support k&r style*/
 		del_ast_sym($1);
 
 		if (!insert(tab, $2, SCO_FILE, __INT_MAX__, 1)) {	// insert function
+			insert_list(tab, $2->data->node->func->params,
+				($2->data->node->func->is_variadic)? SCO_VUNC : SCO_FUNC,
+				@3.last_line, 1);	// insert params
 			insert_list(tab, $3,
 				($2->data->node->func->is_variadic)? SCO_VUNC : SCO_FUNC,
 				@3.last_line, 1);	// insert compound statement
@@ -227,11 +230,29 @@ statement:
 
 declaration:
 	struct_type_def ';' {$$ = $1;}
-|	struct_type_ref ';' {$$ = $1;}
+|	STRUCT IDENT ';' {
+		$$ = new_ast_sym($2, STG_NA, SYM_STRU_T, 
+			new_ast_data(sizeof (int), DATA_STRU, QUAL_NONE,
+				new_ast_stru(0, NULL, NULL)),
+			strdup(@2.filename), @2.first_line);
+		$$->data->node->stru->tag = $$;
+	}
 |	union_type_def ';' {$$ = $1;}
-|	union_type_ref ';' {$$ = $1;}
+|	UNION IDENT ';' {
+		$$ = new_ast_sym($2, STG_NA, SYM_UNIO_T, 
+			new_ast_data(sizeof (int), DATA_UNIO, QUAL_NONE,
+				new_ast_unio(0, NULL, NULL)),
+			strdup(@2.filename), @2.first_line);
+		$$->data->node->unio->tag = $$;
+	}
 |	enum_type_def ';' {$$ = $1;}
-|	enum_type_ref ';' {$$ = $1;}
+|	ENUM IDENT ';' {
+		$$ = new_ast_sym($2, STG_NA, SYM_ENU_T, 
+			new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE,
+				new_ast_enu(0, NULL)),
+			strdup(@2.filename), @2.first_line);
+		$$->data->node->enu->tag = $$;
+	}
 |	declaration_spec init_declarator_list ';' {
 		ast_sym_t *curr;
 
@@ -248,7 +269,14 @@ declaration:
 			}
 			curr = curr->prev;
 		}
-		del_ast_sym($1);
+
+		// the below is wrong, declarator's sym info should be
+		// at the END of the list; rework implementation
+		if (list_start($1)->sym_type == SYM_NONE) {
+			del_ast_sym($1);
+		} else {
+			list_start($$)->prev = $1;
+		}
 
 		$$ = $2;
 	}
@@ -259,23 +287,20 @@ declaration:
 //
 
 declaration_spec:
-	type_spec	{
-		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE, $1,
-			@1.filename, @1.first_line);
-		}
+	type_spec	{$$ = $1;}
 |	stgclass_spec	{
 		$$ = new_ast_sym(NULL, $1, SYM_NONE, NULL,
-			@1.filename, @1.first_line);
+			strdup(@1.filename), @1.first_line);
 		}
 |	qual_spec	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_NONE, $1, NULL),
-			@1.filename, @1.first_line);
+			strdup(@1.filename), @1.first_line);
 		}
 |	func_spec	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_FUNC,
 			new_ast_data(0, DATA_NONE, QUAL_NONE, NULL),
-			@1.filename, @1.first_line);
+			strdup(@1.filename), @1.first_line);
 		$$->is_inline = 1;
 		}
 |	declaration_spec type_spec	{
@@ -334,12 +359,38 @@ func_spec:
 ;
 
 type_spec:
-	float_type_spec	{$$ = $1;}
-|	int_type_spec	{$$ = $1;}
-|	enum_type_spec	{$$ = $1;}
-|	struct_type_spec	{$$ = $1;}
-|	union_type_spec	{$$ = $1;}
-|	VOID	{$$ = new_ast_data(0, DATA_SCAL, QUAL_NONE, new_ast_scal(0, SCAL_VOID));}
+	float_type_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE, $1,
+			strdup(@1.filename), @1.first_line);
+	}
+|	int_type_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE, $1,
+			strdup(@1.filename), @1.first_line);
+	}
+|	enum_type_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+			copy_ast_data(list_start($1)->data),
+			strdup(@1.filename), @1.first_line);
+		$$->prev = $1;
+	}
+|	struct_type_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+			copy_ast_data(list_start($1)->data),
+			strdup(@1.filename), @1.first_line);
+		$$->prev = $1;
+	}
+|	union_type_spec	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+			copy_ast_data(list_start($1)->data),
+			strdup(@1.filename), @1.first_line);
+		$$->prev = $1;
+	}
+|	VOID	{
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+			new_ast_data(0, DATA_SCAL, QUAL_NONE,
+				new_ast_scal(0, SCAL_VOID)),
+			strdup(@1.filename), @1.first_line);
+	}
 // |	IDENT {$$ = NULL; /*typedef not implemented*/}
 ;
 
@@ -400,13 +451,13 @@ enum_type_def:
 		ast_sym_t *temp;
 		$$ = new_ast_sym(NULL, STG_NA, SYM_ENU_T, 
 			new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE,
-				new_ast_enu(NULL)),
-			@1.filename, @1.first_line);
+				new_ast_enu(1, NULL)),
+			strdup(@1.filename), @1.first_line);
 		$$->data->node->enu->tag = $$;
 
 		temp = $3;
 		while (temp != NULL) {
-			temp->data = $$->data;
+			temp->data = copy_ast_data($$->data, 1);
 			temp = temp->prev;
 		}
 		$$ = $3;
@@ -415,8 +466,8 @@ enum_type_def:
 		ast_sym_t *temp;
 		$$ = new_ast_sym($2, STG_NA, SYM_ENU_T, 
 			new_ast_data(sizeof (int), DATA_ENU, QUAL_NONE,
-				new_ast_enu(NULL)),
-			@2.filename, @2.first_line);
+				new_ast_enu(1, NULL)),
+			strdup(@2.filename), @2.first_line);
 		$$->data->node->enu->tag = $$;
 
 		temp = $4;
@@ -431,23 +482,21 @@ enum_type_def:
 
 enum_type_ref:
 	ENUM IDENT	{
-		ast_sym_t *temp = get_sym(tab, $2, get_namespace(SYM_ENU_T), @2.first_line, @2.first_line);
-		if (temp != NULL && temp->sym_type != SYM_ENU_T) {
-			$$ = NULL;
-		} else {
-			$$ = temp;
-		}
+		$$ = new_ast_sym($2, STG_NA, SYM_ENU_T,
+			new_ast_data(0, DATA_SUE, QUAL_NONE,
+				new_ast_sue(DATA_ENU, strdup($2))),
+			strdup(@2.filename), @2.first_line);
 	}
 ;
 
 enum_def_list:
 	enum_constant_def	{
 		$$ = new_ast_sym($1, STG_NONE, SYM_ENU_C, NULL,
-			@1.filename, @1.first_line);
+			strdup(@1.filename), @1.first_line);
 	}
 |	enum_def_list ',' enum_constant_def	{
 		$$ = new_ast_sym($3, STG_NONE, SYM_ENU_C, NULL,
-			@3.filename, @3.first_line);
+			strdup(@3.filename), @3.first_line);
 		$$->prev = $1;
 	}
 ;
@@ -465,17 +514,32 @@ struct_type_spec:
 
 struct_type_def:
 	STRUCT '{' field_list '}' {
-		$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
-			new_ast_stru(0,
-				new_ast_sym(NULL, STG_NONE, SYM_STRU_T, NULL,
-					@1.filename, @1.first_line),
-				$3));
-		
-		$$->node->stru->tag->data = $$;
-		struct_fix($$);
-		$$->node->stru->is_complete = 1;
+		ast_sym_t *temp;
+		$$ = new_ast_sym(NULL, STG_NA, SYM_STRU_T, 
+			new_ast_data(0, DATA_STRU, QUAL_NONE,
+				new_ast_stru(1, NULL, $3)),
+			strdup(@1.filename), @1.first_line);
+		$$->data->node->stru->tag = $$;
+
+		struct_fix($$->data);
 	}
 |	STRUCT IDENT '{' field_list '}' {
+
+		
+		ast_sym_t *temp;
+		$$ = new_ast_sym($2, STG_NA, SYM_STRU_T, 
+			new_ast_data(0, DATA_STRU, QUAL_NONE,
+				new_ast_stru(1, NULL, $4)),
+			strdup(@2.filename), @2.first_line);
+		$$->data->node->stru->tag = $$;
+
+		struct_fix($$->data);
+		list_start($4)->prev = $$;
+		$$ = $4;
+
+
+
+
 		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
 		if (temp != NULL && temp->tab == scope_tab) {
 			if (temp->data->node->stru->is_complete) {
@@ -488,7 +552,7 @@ struct_type_def:
 		$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
 			new_ast_stru(0,
 				new_ast_sym($2, STG_NONE, SYM_STRU_T, NULL,
-					@2.filename, @2.first_line),
+					strdup(@2.filename), @2.first_line),
 				$4));
 			$$->node->stru->tag->data = $$;
 			enter(scope_tab, $$->node->stru->tag, 0);
@@ -507,7 +571,7 @@ struct_type_ref:
 			$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
 				new_ast_stru(0,
 					new_ast_sym($2, STG_NONE, SYM_STRU_T, NULL,
-						@2.filename, @2.first_line),
+						strdup(@2.filename), @2.first_line),
 				NULL));
 			$$->node->stru->tag->data = $$;
 			enter(scope_tab, $$->node->stru->tag, 0);
@@ -528,7 +592,7 @@ union_type_def:
 		$$ = new_ast_data(0, DATA_UNIO, QUAL_NONE,
 			new_ast_unio(0,
 				new_ast_sym(NULL, STG_NONE, SYM_UNIO_T, NULL,
-					@1.filename, @1.first_line),
+					strdup(@1.filename), @1.first_line),
 				$3));
 		
 		$$->node->unio->tag->data = $$;
@@ -548,7 +612,7 @@ union_type_def:
 		$$ = new_ast_data(0, DATA_UNIO, QUAL_NONE,
 			new_ast_unio(0,
 				new_ast_sym($2, STG_NONE, SYM_UNIO_T, NULL,
-					@2.filename, @2.first_line),
+					strdup(@2.filename), @2.first_line),
 				$4));
 			$$->node->unio->tag->data = $$;
 			enter(scope_tab, $$->node->unio->tag, 0);
@@ -567,7 +631,7 @@ union_type_ref:
 			$$ = new_ast_data(0, DATA_ENU, QUAL_NONE,
 				new_ast_unio(0,
 					new_ast_sym($2, STG_NONE, SYM_UNIO_T, NULL,
-						@2.filename, @2.first_line),
+						strdup(@2.filename), @2.first_line),
 				NULL));
 			$$->node->unio->tag->data = $$;
 			enter(scope_tab, $$->node->unio->tag, 0);
@@ -580,7 +644,7 @@ union_type_ref:
 
 field_list:
 	component_declaration {
-		$$ = new_ast_tab(scope_tab, SCOPE_STRUNIO, @1.filename, @1.first_line);
+		$$ = new_ast_tab(scope_tab, SCOPE_STRUNIO, strdup(@1.filename), @1.first_line);
 		enter($$, $1, 0);
 	}
 |	field_list component_declaration {
@@ -668,7 +732,7 @@ qual_spec_list:
 ;
 
 direct_declarator:
-	IDENT	{$$ = new_ast_sym($1, STG_NONE, SYM_NONE, NULL, @1.filename, @1.first_line);}
+	IDENT	{$$ = new_ast_sym($1, STG_NONE, SYM_NONE, NULL, strdup(@1.filename), @1.first_line);}
 |	'(' declarator ')'	{$$ = $2;}
 |	array_declarator	{$$ = $1;}
 |	function_declarator	{$$ = $1;}
@@ -706,7 +770,7 @@ param_type_list:
 
 param_list:
 	param_declaration {
-		$$ = new_ast_tab(scope_tab, SCOPE_FUNC, @1.filename, @1.first_line);
+		$$ = new_ast_tab(scope_tab, SCOPE_FUNC, strdup(@1.filename), @1.first_line);
 		enter($$, $1, 0);
 	}
 |	param_list ',' param_declaration {
@@ -744,7 +808,7 @@ param_declarator:
 abstract_declarator:
 	pointer {
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE, $1,
-			@1.filename, @1.first_line);
+			strdup(@1.filename), @1.first_line);
 	}
 |	pointer direct_abstract_declarator {
 		$2->tail = install_tail($2->tail, $1);
@@ -759,7 +823,7 @@ direct_abstract_declarator:
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_ARY, QUAL_NONE,
 				new_ast_ary($2, NULL)),
-			@1.filename, @1.first_line);
+			strdup(@1.filename), @1.first_line);
 	}
 |	direct_abstract_declarator '[' num_opt ']'  {
 		$1->tail = install_tail($1->tail,
@@ -771,7 +835,7 @@ direct_abstract_declarator:
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_FUNC, QUAL_NONE,
 				new_ast_func(0, NULL, $2)),
-			@1.filename, @1.first_line);
+			strdup(@1.filename), @1.first_line);
 	}
 |	direct_abstract_declarator '(' param_type_list_opt ')' {
 		$1->tail = install_tail($1->tail,

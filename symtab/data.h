@@ -133,14 +133,10 @@ ast_data_t *new_ast_data(int size, char data_type, char qual, union ast_type *no
 
 // Recursively creates a deep copy of data down to the
 // specified depth, beyond which further nested data is
-// shallow copied. Depth = -1 results in a full-ish
-// deep copy.
+// shallow copied. Depth = -1 results in a full deep copy
+// aside from struct/union/enum tags, which are always
+// shallow copied to preserve type compatibility.
 ast_data_t *copy_ast_data(ast_data_t *data, int depth);
-
-// Makes a deep copy of the params ast_sym_t list of a
-// function type (shallow copies the types of the params
-// within).
-ast_sym_t *copy_params(ast_sym_t *params);
 
 // Dynamically allocates and creates a pointer to the
 // composite type for src and target if both are compatible.

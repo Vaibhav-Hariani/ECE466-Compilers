@@ -10,10 +10,36 @@ ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
     sym->stg_type = stg_type;
     sym->sym_type = sym_type;
     sym->data = data;
-    sym->tail = data;
+    sym->tail = get_tail(data);
     sym->filename = filename;
     sym->start = start;
     return sym;
+}
+
+ast_sym_t *copy_ast_sym(ast_sym_t *sym) {
+    ast_sym_t *copy;
+
+    copy = new_ast_sym(strdup(sym->name), sym->stg_type, sym->sym_type,
+        copy_ast_data(sym->data, -1), strdup(sym->filename), sym->start);
+    copy->end = sym->end;
+    copy->sco_type = sym->sco_type;
+    copy->is_inline = sym->is_inline;
+    copy->offset = sym->offset;
+    return copy;
+}
+
+ast_sym_t *copy_sym_list(ast_sym_t *sym) {
+    ast_sym_t *copy, *curr;
+
+    curr = copy_ast_sym(sym);
+    copy = curr;
+
+    while (sym->prev != NULL) {
+        sym = sym->prev;
+        curr->prev = copy_ast_sym(sym);
+        curr = curr->prev;
+    }
+    return copy;
 }
 
 ast_sym_t *del_ast_sym(ast_sym_t *sym) {
@@ -164,6 +190,19 @@ int union_fix_memb(ast_data_t *data, ast_sym_t *memb) {
 
 int union_fix(ast_data_t *data) {
     return union_fix_memb(data, data->node->unio->membs);
+}
+
+ast_data_t *get_tail(ast_data_t *data) {
+    switch(data->data_type) {
+        case DATA_PTR:
+            return (data->node->ptr->to == NULL)? data : get_tail(data->node->ptr->to);
+        case DATA_ARY:
+            return (data->node->ary->elem == NULL)? data : get_tail(data->node->ary->elem);
+        case DATA_FUNC:
+            return (data->node->func->ret == NULL)? data : get_tail(data->node->func->ret);
+        default:
+            return data;
+    }
 }
 
 ast_data_t *install_tail(ast_sym_t *sym, ast_data_t *tail) {

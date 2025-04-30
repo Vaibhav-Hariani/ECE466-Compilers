@@ -78,6 +78,14 @@ typedef struct ast_sym {
 ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
     ast_data_t *data, char *filename, int start);
 
+// Returns a deep copy of sym and all of its data type
+// information. The copy's prev field is NULL.
+ast_sym_t *copy_ast_sym(ast_sym_t *sym);
+
+// Makes a deep copy of the symbol list to whose final
+// member sym points.
+ast_sym_t *copy_sym_list(ast_sym_t *sym);
+
 // Destroys symbol pointed to by sym and all storage it
 // consumes. Returns a pointer to the previous symbol in the
 // list.
@@ -111,6 +119,10 @@ int struct_fix(ast_data_t *data);
 // requirements in a union array. Handles pointers to
 // unions of its own type, nested definitions.
 int union_fix(ast_data_t *data);
+
+// Finds the tail of the (potentially) multi-layer data type
+// data. 
+ast_data_t *get_tail(ast_data_t *data);
 
 // Installs tail at the reasonable spot in sym's tail, which
 // represents the current tail. Returns tail on success.
