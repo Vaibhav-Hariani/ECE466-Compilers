@@ -7,13 +7,11 @@
 // }
 enum node_type{
     VAR,
-    TMP,
-    CONST
+    TMP
 };
 
 enum QUAD_CODES{
-    STORE=0,
-    ADD
+    STORE
 };
 
 enum scope{
@@ -39,8 +37,6 @@ struct gen_node_t{
 union generic_node{
     struct ident* v; 
     struct tmp* t;
-    //This needs to be defined
-    struct const_val* c;
 };
 
 struct quad {
@@ -49,27 +45,11 @@ struct quad {
 } typedef quad;
 
 struct big_block {
-    //Array of pointers
-    quad** quads;
+    quad* quads;
     int num_el;
     int block_ind;
 } typedef big_block;
 
-union quad_gen_union {
-    quad* quad;
-    big_block* bb;
-    struct gen_node_t* symbol;
-};
-
-enum gen_union_id {
-    QUAD,
-    BIG_BLOCK,
-    SYM
-};
-struct quad_ref{
-    enum gen_union_id type;
-    union quad_gen_union element;
-};
 
 //API
 //When control flow logic is detected, generate quads for each of those trees, and then append them to a new big_block
