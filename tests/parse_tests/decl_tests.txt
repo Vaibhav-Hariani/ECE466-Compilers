@@ -1,3 +1,4 @@
+struct a;
 struct a {int b, c;};
 
 int x, y[120];
@@ -5,4 +6,5 @@ static char ***z;
 
 volatile struct a sclomp;
 
-union {int b; char c;} jonkler;
+extern union {int b; char c;} jonkler;
+static const struct doesnt_exist *jangler;

@@ -145,7 +145,7 @@ ast_sym_t *resolve_tag(ast_tab_t *tab, ast_sym_t *sym) {
 }
 
 int struct_fix_memb(ast_data_t *data, ast_sym_t *memb) {
-    int align, max_align;
+    int pos_mod, align, max_align;
     if (memb == NULL) {
         data->size = 0;
         return 0;
@@ -158,7 +158,9 @@ int struct_fix_memb(ast_data_t *data, ast_sym_t *memb) {
         max_align = align;
     }
 
-    memb->offset = data->size += (align - ((data->size-1) % align + 1));
+    pos_mod = (data->size-1) % align;
+    pos_mod += (pos_mod < 0)? align : 0;
+    memb->offset = data->size + (align - pos_mod - 1);
     data->size = memb->offset + memb->data->size;
     return max_align;
 }

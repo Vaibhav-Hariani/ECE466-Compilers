@@ -88,6 +88,7 @@ int sizeup(unsigned int size);
 // A simple hash function based on a symbol's name (key) and
 // its namespace.
 unsigned int hash(ast_tab_t *tab, char *key, char namespace);
+
 // Returns -1 if a symbol with the specified key and
 // namespace and whose scope is or surrounds that defined
 // by start and end does not exist, or the cell array index

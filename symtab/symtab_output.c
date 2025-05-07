@@ -227,7 +227,13 @@ int print_memb_decl(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_na
     print_indent(num_tabs + 1);
     printf("data type:\n");
     print_data(memb->data, num_tabs + 2);
-    print_indent(num_tabs);
+    print_indent(num_tabs + 1);
+    if (sym->sym_type == SYM_STRU_T) {
+        printf("offset:\n");
+        print_indent(num_tabs + 2);
+        printf("%d\n", memb->offset);
+        print_indent(num_tabs);
+    }
     printf("}\n");
     return 0;
 }
@@ -248,6 +254,10 @@ int print_sym_decl(ast_sym_t *sym, int num_tabs) {
     print_indent(num_tabs + 1);
     printf("data type:\n");
     print_data(sym->data, num_tabs+2);
+    print_indent(num_tabs + 1);
+    printf("size:\n");
+    print_indent(num_tabs + 2);
+    printf("%d\n", sym->data->size);
     print_indent(num_tabs);
     printf("}\n\n");
     return 0;
