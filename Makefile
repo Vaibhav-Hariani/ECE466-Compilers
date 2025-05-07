@@ -12,7 +12,7 @@ bison_parser: parser/ast_nodes.c parser/ast_nodes.h parser/parser.y parser/parse
 bison_parser_debug: parser/ast_nodes.c parser/ast_nodes.h parser/parser.y
 	cd parser && bison --debug -d parser.y 
 
-parser: flex bison
+parser: flex bison_parser
 	gcc -o parser/parser.out $(CFLAGS) parser/parser.tab.c lexer/lex.yy.c parser/ast_nodes.c parser/parse_output.c
 
 debug_parser: flex bison_debug

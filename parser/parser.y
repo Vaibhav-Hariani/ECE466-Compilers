@@ -138,24 +138,25 @@ arg_list: %empty { $$ = new_ast_list(0);}
 |   arg_list ',' assign_expr %prec POSTFIX { $$ = append_ast_list($1, $3);}
 ;
 
-declaration: decl_spec init_list ';'
+/* declaration: decl_spec init_list ';' */
 
-init_list: %empty
+/* init_list: %empty
 |   init_decl
 |   init_list ',' init_decl   
-;
+; */
 
 // The second line is optional
-init_decl: declarator
+/* init_decl: declarator
 |   declarator = init
-;
+; */
 
 
-decl_spec: %empty
+/* decl_spec: %empty
 | storage_class decl_spec
 | type_spec decl_spec
 | type_qual decl_spec
-| function_spec decl_spec
+| function_spec decl_spec 
+; */
 
 storage_class: EXTERN
 |   STATIC
@@ -176,12 +177,13 @@ type_spec:   VOID
 |   UNSIGNED
 |   BOOL
 |   COMPLEX
-|   struct_union_spec
-|   enum_spec //Optional 
-|   typedef_name //Also optional
+/* |   struct_union_spec */
 ;
+/* |   enum_spec //Optional 
+|   typedef_name //Also optional
+; */
 
-struct_union_spec: STRUCT '{' struct_decl_list '}'
+/* struct_union_spec: STRUCT '{' struct_decl_list '}'
 |   STRUCT IDENT '{' struct_decl_list '}'
 |   STRUCT IDENT
 |   UNION '{' struct_decl_list '}'
@@ -191,10 +193,11 @@ struct_union_spec: STRUCT '{' struct_decl_list '}'
 struct_decl_list: struct_decl
 | struct_decl_list struct_decl
 ;
-struct_decl:    spec_quali_list struct_decl
 
-
-function_spec: 
+struct_decl: struct_decl ;
+ */
+/* 
+function_spec:  */
 
 
 /* keyword: STRUCT IDENT
