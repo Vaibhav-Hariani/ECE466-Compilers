@@ -238,10 +238,12 @@ int print_sym_decl(ast_sym_t *sym, int num_tabs) {
         (sym->sym_type == SYM_VAR)? "variable" : "function",
         sym->name, sym->filename, sym->start);
     print_indent(num_tabs + 1);
-    printf("scope:     \t");
+    printf("scope:\n");
+    print_indent(num_tabs + 2);
     print_scope(sym->sco_type, sym->filename, sym->start);
     print_indent(num_tabs + 1);
-    printf("stg class: \t");
+    printf("stg class:\n");
+    print_indent(num_tabs + 2);
     print_stg(sym->stg_type);
     print_indent(num_tabs + 1);
     printf("data type:\n");
