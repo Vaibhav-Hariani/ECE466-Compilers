@@ -6,6 +6,11 @@
 #include <string.h>
 #include <errno.h>
 #include "yylval.h"
+#include "data.h"
+#include "table.h"
+
+typedef struct ast_data ast_data_t;
+typedef struct ast_tab ast_tab_t;
 
 enum stg_type {
     STG_NONE = 0,
@@ -42,7 +47,6 @@ enum sco_type {
     SCO_NONE = 0,
     SCO_FILE,
     SCO_FUNC,
-    SCO_VUNC,
     SCO_BLOCK,
     SCO_PROTO,
     SCO_STRUNIO,
@@ -103,7 +107,7 @@ int del_sym_list(ast_sym_t *sym);
 // struct/union/enum with the same tag name in the closest
 // scope and replaces the tail with that type. Returns NULL
 // if no suitable struct/union/enum type is found.
-ast_sym_t *resolve_tag(ast_sym_t *tab, ast_sym_t *sym);
+ast_sym_t *resolve_tag(ast_tab_t *tab, ast_sym_t *sym);
 
 // Sets the size of a struct data type whose members are
 // stored in the struct's symbol table. Pads the struct such

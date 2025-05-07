@@ -34,7 +34,7 @@ ast_tab_t *new_table(unsigned int min_size) {
 int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup) {
     int i;
     ast_data_t *comb;
-    ast_sym_t *old, *tag;
+    ast_sym_t *tag;
 
     if (tab->filled * 2 >= tab->size) {
         if (rehash(tab) == -1) {
@@ -84,7 +84,7 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
         }
     }
 
-    i = hash(tab, sym, get_namespace(sym->sym_type));
+    i = hash(tab, sym->name, get_namespace(sym->sym_type));
     while (tab->cells[i] != NULL) {
         if (!strcmp(sym->name, tab->cells[i]->sym->name)
         && get_namespace(tab->cells[i]->sym->sym_type) == get_namespace(sym->sym_type)
@@ -198,7 +198,7 @@ int set_sym(ast_tab_t *tab, ast_sym_t *sym) {
     return 0;
 }
 
-int remove(ast_tab_t *tab, char *key, char namespace, int start, int end) {
+int remove_sym(ast_tab_t *tab, char *key, char namespace, int start, int end) {
     int i;
 
     i = locate(tab, key, namespace, start, end);
@@ -223,8 +223,6 @@ int del_table(ast_tab_t *tab) {
     return 0;
 }
 
-// Returns a prime number of magnitude greater than or equal
-// to the size passed, or -1 if that would be too big.
 int sizeup(unsigned int size) {
     int i;
     unsigned int primes[21] = {
@@ -243,14 +241,12 @@ int sizeup(unsigned int size) {
     return primes[i];
 }
 
-// A simple hash function based on a symbol's name (key) and
-// its namespace.
 unsigned int hash(ast_tab_t *tab, char *key, char namespace) {
     unsigned int hash_val;
     int i;
 
     hash_val = 0;
-    for (i = 0; key[i] != NULL; i++) {
+    for (i = 0; key[i] != '\0'; i++) {
         hash_val = 37 * hash_val + key[i];
     }
 
@@ -259,16 +255,11 @@ unsigned int hash(ast_tab_t *tab, char *key, char namespace) {
     return hash_val % tab->size; // this hash function is very  bad
 }
 
-// Returns -1 if a symbol with the specified key and
-// namespace and whose scope is or surrounds that defined
-// by start and end does not exist, or the cell array index
-// of the symbol whose scope most closely fits start and end
-// if otherwise.
 unsigned int locate(ast_tab_t *tab, char *key, char namespace, int start, int end) {
     int i, ret;
 
     ret = -1;
-    i = hash(key, tab->size, namespace);
+    i = hash(tab, key, namespace);
     while (tab->cells[i] != NULL) {
         if (!strcmp(key, tab->cells[i]->sym->name)  // same key
         && get_namespace(tab->cells[i]->sym->sym_type) == namespace // same namespace
@@ -285,8 +276,6 @@ unsigned int locate(ast_tab_t *tab, char *key, char namespace, int start, int en
     return ret;
 }
 
-// Increases the size of our table to the next size returned
-// by sizeup and reinserts only the non-deleted cells.
 int rehash(ast_tab_t *tab) {
     int i, old_size;
     ast_cell_t **old_cells;
@@ -318,7 +307,7 @@ int rehash(ast_tab_t *tab) {
         return -1;
     }
 
-    tab->cells = realloc(tab->size, sizeof (ast_cell_t *));
+    tab->cells = reallocarray(tab->cells, tab->size, sizeof (ast_cell_t *));
     if (errno != 0) {
         /*ERROR out of memory*/
         return -1;
@@ -326,7 +315,7 @@ int rehash(ast_tab_t *tab) {
 
     for (i = 0; i < old_size; i++) {
         if (old_cells[i] != NULL) {
-            insert(tab, old_cells[i], old_cells[i]->sym->end, old_cells[i]->sym->sco_type, 0);
+            insert(tab, old_cells[i]->sym, old_cells[i]->sym->end, old_cells[i]->sym->sco_type, 0);
             // insert from old_cells to tab->cells
         }
     }

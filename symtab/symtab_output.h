@@ -1,9 +1,13 @@
 #ifndef SYMTAB_OUTPUT_H
 #define SYMTAB_OUTPUT_H
 
-#include "symbol.h"
 #include "table.h"
+#include "symbol.h"
 #include "data.h"
+
+typedef struct ast_tab ast_tab_t;
+typedef struct ast_sym ast_sym_t;
+typedef struct ast_data ast_data_t;
 
 // Prints storage class and data type information of
 // all parameters stored in params list.

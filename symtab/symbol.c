@@ -127,25 +127,7 @@ int get_align(ast_sym_t *memb, ast_sym_t *sym) {
     return align;
 }
 
-int struct_fix_memb(ast_data_t *data, ast_sym_t *memb) {
-    int align, max_align;
-    if (memb == NULL) {
-        data->size = 0;
-        return 0;
-    }
-
-    max_align = struct_fix_memb(memb->prev, data->node->stru->tag);
-    align = get_align(memb, data->node->stru->tag);
-    if (align > max_align) {
-        max_align = align;
-    }
-
-    memb->offset = data->size += (align - ((data->size-1) % align + 1));
-    data->size = memb->offset + memb->data->size;
-    return max_align;
-}
-
-ast_sym_t *resolve_tag(ast_sym_t *tab, ast_sym_t *sym) {
+ast_sym_t *resolve_tag(ast_tab_t *tab, ast_sym_t *sym) {
     ast_sym_t *tag;
 
     tag = get_sym(tab, sym->tail->node->sue->name, NS_TAG, sym->start, sym->end);
@@ -161,6 +143,25 @@ ast_sym_t *resolve_tag(ast_sym_t *tab, ast_sym_t *sym) {
         return tag;
     }
     return NULL;
+}
+
+int struct_fix_memb(ast_data_t *data, ast_sym_t *memb) {
+    int align, max_align;
+    if (memb == NULL) {
+        data->size = 0;
+        return 0;
+    }
+
+    memb->sym_type = SYM_STRU_M;
+    max_align = struct_fix_memb(data, memb->prev);
+    align = get_align(memb, data->node->stru->tag);
+    if (align > max_align) {
+        max_align = align;
+    }
+
+    memb->offset = data->size += (align - ((data->size-1) % align + 1));
+    data->size = memb->offset + memb->data->size;
+    return max_align;
 }
 
 int struct_fix(ast_data_t *data) {
@@ -180,8 +181,9 @@ int union_fix_memb(ast_data_t *data, ast_sym_t *memb) {
         return 0;
     }
 
-    union_fix_memb(memb->prev, data->node->stru->tag);
-    align = get_align(memb, data->node->stru->tag);
+    memb->sym_type = SYM_UNIO_M;
+    union_fix_memb(data, memb->prev);
+    align = get_align(memb, data->node->unio->tag);
     if (align > data->size) {
         data->size = align;
     }

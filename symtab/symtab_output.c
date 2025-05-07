@@ -66,7 +66,6 @@ int print_scope(int sco_type, char *filename, int line) {
             printf("global ");
             break;
         case SCO_FUNC:
-        case SCO_VUNC:
             printf("function ");
             break;
         case SCO_BLOCK:
@@ -114,8 +113,6 @@ int print_stg(int stg_type) {
 }
 
 int print_params(ast_sym_t *params, int num_tabs) {
-    ast_sym_t *curr;
-
     if (params == NULL) {
         return 0;
     }
@@ -123,13 +120,13 @@ int print_params(ast_sym_t *params, int num_tabs) {
     print_params(params->prev, num_tabs);
 
     print_indent(num_tabs);
-    printf("parameter %s {\n", curr->name);
+    printf("parameter %s {\n", params->name);
     print_indent(num_tabs + 1);
     printf("stg class: \t");
-    print_stg(curr->stg_type);
+    print_stg(params->stg_type);
     print_indent(num_tabs + 1);
     printf("data type:\n");
-    print_data(curr->data, num_tabs+2);
+    print_data(params->data, num_tabs+2);
     print_indent(num_tabs);
     printf("}\n");
 

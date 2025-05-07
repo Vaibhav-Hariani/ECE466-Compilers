@@ -57,7 +57,9 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %code requires {
     #include "yylval.h"
     #include "ast_nodes.h"
-    #include "ast_symtab.h"
+    #include "table.h"
+    #include "symbol.h"
+    #include "data.h"
     #include <stdio.h>
 	#include <string.h>
     #include "symtab_output.h"
@@ -99,8 +101,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <sym> declarator declarator_list;
 %nterm <sym> direct_declarator array_declarator function_declarator;
 %nterm <sym> param_declarator abstract_declarator direct_abstract_declarator;
-%nterm <tab> field_list;
-%nterm <tab> param_type_list_opt param_type_list param_list;
+%nterm <sym> field_list param_list;
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
@@ -114,7 +115,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 //unops take in an lvalue, and do one of 3 operations to them.
 
 prog:
-	%empty	{tab = init_table(0); $$ = NULL;}
+	%empty	{tab = new_table(0); $$ = NULL;}
 |	declaration_or_fndef	{$$ = NULL;}
 ;
 
@@ -123,14 +124,14 @@ declaration_or_fndef:
 		switch ($1->stg_type) {
 			case STG_EXTERN_EXP:
 			case STG_STATIC:
-				$2->stg_type = $1->stg_type;
+				$1->stg_type = $1->stg_type;
 				break;
 			case STG_NONE:
-				$2->stg_type = STG_EXTERN_IMP;
+				$1->stg_type = STG_EXTERN_IMP;
 				break;
 			default:
 				/*ERROR invalid storage class specifier*/
-				$2->stg_type = STG_EXTERN_IMP;
+				$1->stg_type = STG_EXTERN_IMP;
 				break;
 		}
 
@@ -144,45 +145,45 @@ declaration_or_fndef:
 ;
 
 function_def: /*does not support k&r style*/
-	declaration_spec declarator compound_statement {
+	declaration_spec function_declarator compound_statement {
 		if ($1->data->qual != QUAL_NONE) {
 			/*ERROR qualifiers invalid*/
 		}
 
-		if ($2->data->data_type != DATA_FUNC) {
+		else if ($2->data->data_type != DATA_FUNC) {
 			/*ERROR expected a semicolon after declarator?*/
 		}
 
-		switch ($1->stg_type) {
-			case STG_EXTERN_EXP:
-			case STG_STATIC:
-				$2->stg_type = $1->stg_type;
-				break;
-			case STG_NONE:
-				$2->stg_type = STG_EXTERN_IMP;
-				break;
-			default:
-				/*ERROR invalid storage class specifier*/
-				$2->stg_type = STG_EXTERN_IMP;
-				break;
-		}
+		else {
+			switch ($1->stg_type) {
+				case STG_EXTERN_EXP:
+				case STG_STATIC:
+					$2->stg_type = $1->stg_type;
+					break;
+				case STG_NONE:
+					$2->stg_type = STG_EXTERN_IMP;
+					break;
+				default:
+					/*ERROR invalid storage class specifier*/
+					$2->stg_type = STG_EXTERN_IMP;
+					break;
+			}
 
-		$2->sym_type = SYM_FUNC;
-		$2->data->node->func->is_complete = 1;
-		$2->tail = install_tail($2->data, $1->data);
-		del_ast_sym($1);
+			$2->sym_type = SYM_FUNC;
+			$2->data->node->func->is_complete = 1;
+			$2->tail = install_tail($2, $1->data);
+			del_ast_sym($1);
 
-		if (!insert(tab, $2, SCO_FILE, __INT_MAX__, 1)) {	// insert function
-			insert_list(tab, $2->data->node->func->params,
-				($2->data->node->func->is_variadic)? SCO_VUNC : SCO_FUNC,
-				@3.last_line, 1);	// insert params
-			insert_list(tab, $3,
-				($2->data->node->func->is_variadic)? SCO_VUNC : SCO_FUNC,
-				@3.last_line, 1);	// insert compound statement
-			$$ = $2;
-		} else {
-			del_sym_list($3);
-			$$ = NULL;
+			if (!insert(tab, $2, SCO_FILE, __INT_MAX__, 1)) {	// insert function
+				insert_list(tab, $2->data->node->func->params, SCO_FUNC,
+					@3.last_line, 1);	// insert params
+				insert_list(tab, $3, SCO_FUNC,
+					@3.last_line, 1);	// insert compound statement
+				$$ = $2;
+			} else {
+				del_sym_list($3);
+				$$ = NULL;
+			}
 		}
 	}
 ;
@@ -288,7 +289,46 @@ declaration:
 
 declaration_spec:
 	type_spec	{$$ = $1;}
-|	stgclass_spec	{
+|	type_spec untyped_declaration_spec	{
+		$$ = $2;
+		if ($$->data->data_type != DATA_NONE) {
+			/*ERROR can only have one type specifier*/
+		} else {
+			$1->data->qual = $$->data->qual;
+			del_ast_data($$->data);
+			$$->data = copy_ast_data($1->data, -1);
+			del_ast_sym($1);
+		}
+	}
+|	stgclass_spec declaration_spec {
+		$$ = $2;
+		if ($$->stg_type != STG_NONE && $$->stg_type != $1) {
+			/*ERROR*/
+		} else {
+			$$->stg_type = $1;
+		}
+	}
+|	qual_spec declaration_spec {
+		$$ = $2;
+		if ($$->data == NULL) {
+			$$->data = new_ast_data(0, DATA_NONE, $1, NULL);
+		} else {
+			$$->data->qual |= $1;
+		}
+	}
+|	func_spec declaration_spec {
+		$$ = $2;
+		if ($$->sym_type != SYM_NONE && $$->sym_type != SYM_FUNC) {
+			/*ERROR*/
+		} else {
+			$$->sym_type = SYM_FUNC;
+		}
+		$$->is_inline = 1;
+	}
+;
+
+untyped_declaration_spec:
+	stgclass_spec	{
 		$$ = new_ast_sym(NULL, $1, SYM_NONE, NULL,
 			strdup(@1.filename), @1.first_line);
 		}
@@ -303,43 +343,32 @@ declaration_spec:
 			strdup(@1.filename), @1.first_line);
 		$$->is_inline = 1;
 		}
-|	declaration_spec type_spec	{
-		if ($1->data->data_type != DATA_NONE) {
-			/*ERROR can only have one type specifier*/
-		} else {
-			$2->data->qual = $1->data->qual;
-			del_ast_data($1->data);
-			$1->data = $2;
-		}
-		$$ = $1;
-	}
-|	declaration_spec stgclass_spec	{
-		if ($1->stg_type != STG_NONE && $1->stg_type != $2) {
+|	stgclass_spec untyped_declaration_spec {
+		$$ = $2;
+		if ($$->stg_type != STG_NONE && $$->stg_type != $1) {
 			/*ERROR*/
 		} else {
-			$1->stg_type = $2;
+			$$->stg_type = $1;
 		}
-		$$ = $1;
 	}
-|	declaration_spec qual_spec	{
-		if ($1->data == NULL) {
-			$1->data = new_ast_data(0, DATA_NONE, $2, NULL);
+|	qual_spec untyped_declaration_spec {
+		$$ = $2;
+		if ($$->data == NULL) {
+			$$->data = new_ast_data(0, DATA_NONE, $1, NULL);
 		} else {
-			$1->data->qual |= $2;
+			$$->data->qual |= $1;
 		}
-		$$ = $1;
 	}
-|	declaration_spec func_spec	{
-		if ($1->sym_type != SYM_NONE && $1->sym_type != SYM_FUNC) {
+|	func_spec untyped_declaration_spec {
+		$$ = $2;
+		if ($$->sym_type != SYM_NONE && $$->sym_type != SYM_FUNC) {
 			/*ERROR*/
 		} else {
-			$1->sym_type = SYM_FUNC;
+			$$->sym_type = SYM_FUNC;
 		}
-		$1->is_inline = 1;
-		$$ = $1;
+		$$->is_inline = 1;
 	}
 ;
-
 stgclass_spec:
 	EXTERN	{$$ = (char) STG_EXTERN_EXP;}
 |	STATIC	{$$ = (char) STG_STATIC;}
@@ -369,19 +398,19 @@ type_spec:
 	}
 |	enum_type_spec	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
-			copy_ast_data(list_start($1)->data),
+			copy_ast_data(list_start($1)->data, -1),
 			strdup(@1.filename), @1.first_line);
 		$$->prev = $1;
 	}
 |	struct_type_spec	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
-			copy_ast_data(list_start($1)->data),
+			copy_ast_data(list_start($1)->data, -1),
 			strdup(@1.filename), @1.first_line);
 		$$->prev = $1;
 	}
 |	union_type_spec	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
-			copy_ast_data(list_start($1)->data),
+			copy_ast_data(list_start($1)->data, -1),
 			strdup(@1.filename), @1.first_line);
 		$$->prev = $1;
 	}
@@ -514,7 +543,6 @@ struct_type_spec:
 
 struct_type_def:
 	STRUCT '{' field_list '}' {
-		ast_sym_t *temp;
 		$$ = new_ast_sym(NULL, STG_NA, SYM_STRU_T, 
 			new_ast_data(0, DATA_STRU, QUAL_NONE,
 				new_ast_stru(1, NULL, $3)),
@@ -524,9 +552,6 @@ struct_type_def:
 		struct_fix($$->data);
 	}
 |	STRUCT IDENT '{' field_list '}' {
-
-		
-		ast_sym_t *temp;
 		$$ = new_ast_sym($2, STG_NA, SYM_STRU_T, 
 			new_ast_data(0, DATA_STRU, QUAL_NONE,
 				new_ast_stru(1, NULL, $4)),
@@ -534,51 +559,15 @@ struct_type_def:
 		$$->data->node->stru->tag = $$;
 
 		struct_fix($$->data);
-		list_start($4)->prev = $$;
-		$$ = $4;
-
-
-
-
-		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
-		if (temp != NULL && temp->tab == scope_tab) {
-			if (temp->data->node->stru->is_complete) {
-				/*ERROR redeclaration not permitted*/
-			} else {
-				$$ = temp->data;
-				$$->node->stru->minitab = $4;
-			}
-		} else {
-		$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
-			new_ast_stru(0,
-				new_ast_sym($2, STG_NONE, SYM_STRU_T, NULL,
-					strdup(@2.filename), @2.first_line),
-				$4));
-			$$->node->stru->tag->data = $$;
-			enter(scope_tab, $$->node->stru->tag, 0);
-		}
-		
-		struct_fix($$);
-		$$->node->stru->is_complete = 1;
 	}
 ;
 
 struct_type_ref:
 	STRUCT IDENT	{
-		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
-		if (temp == NULL) {
-			/*install incomplete tag in symbol table*/
-			$$ = new_ast_data(0, DATA_STRU, QUAL_NONE,
-				new_ast_stru(0,
-					new_ast_sym($2, STG_NONE, SYM_STRU_T, NULL,
-						strdup(@2.filename), @2.first_line),
-				NULL));
-			$$->node->stru->tag->data = $$;
-			enter(scope_tab, $$->node->stru->tag, 0);
-		} else if ($$->node->stru->tag->sym_type != SYM_STRU_T) {
-			/*ERROR*/
-			$$ = NULL;
-		}
+		$$ = new_ast_sym($2, STG_NA, SYM_STRU_T,
+			new_ast_data(0, DATA_SUE, QUAL_NONE,
+				new_ast_sue(DATA_STRU, strdup($2))),
+			strdup(@2.filename), @2.first_line);
 	}
 ;
 
@@ -589,67 +578,39 @@ union_type_spec:
 
 union_type_def:
 	UNION '{' field_list '}' {
-		$$ = new_ast_data(0, DATA_UNIO, QUAL_NONE,
-			new_ast_unio(0,
-				new_ast_sym(NULL, STG_NONE, SYM_UNIO_T, NULL,
-					strdup(@1.filename), @1.first_line),
-				$3));
-		
-		$$->node->unio->tag->data = $$;
-		union_fix($$);
-		$$->node->unio->is_complete = 1;
+		$$ = new_ast_sym(NULL, STG_NA, SYM_UNIO_T, 
+			new_ast_data(0, DATA_UNIO, QUAL_NONE,
+				new_ast_unio(1, NULL, $3)),
+			strdup(@1.filename), @1.first_line);
+		$$->data->node->unio->tag = $$;
+
+		union_fix($$->data);
 	}
 |	UNION IDENT '{' field_list '}'  {
-		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
-		if (temp != NULL && temp->tab == scope_tab) {
-			if (temp->data->node->unio->is_complete) {
-				/*ERROR redeclaration not permitted*/
-			} else {
-				$$ = temp->data;
-				$$->node->unio->minitab = $4;
-			}
-		} else {
-		$$ = new_ast_data(0, DATA_UNIO, QUAL_NONE,
-			new_ast_unio(0,
-				new_ast_sym($2, STG_NONE, SYM_UNIO_T, NULL,
-					strdup(@2.filename), @2.first_line),
-				$4));
-			$$->node->unio->tag->data = $$;
-			enter(scope_tab, $$->node->unio->tag, 0);
-		}
-		
-		union_fix($$);
-		$$->node->unio->is_complete = 1;
+		$$ = new_ast_sym($2, STG_NA, SYM_UNIO_T, 
+			new_ast_data(0, DATA_UNIO, QUAL_NONE,
+				new_ast_unio(1, NULL, $4)),
+			strdup(@2.filename), @2.first_line);
+		$$->data->node->unio->tag = $$;
+
+		union_fix($$->data);
 	}
 ;
 
 union_type_ref:
 	UNION IDENT	{
-		ast_sym_t *temp = lookup(scope_tab, $2, SYM_STRU_T);
-		if (temp == NULL) {
-			/*install incomplete tag in symbol table*/
-			$$ = new_ast_data(0, DATA_ENU, QUAL_NONE,
-				new_ast_unio(0,
-					new_ast_sym($2, STG_NONE, SYM_UNIO_T, NULL,
-						strdup(@2.filename), @2.first_line),
-				NULL));
-			$$->node->unio->tag->data = $$;
-			enter(scope_tab, $$->node->unio->tag, 0);
-		} else if ($$->node->unio->tag->sym_type != SYM_UNIO_T) {
-			/*ERROR*/
-			$$ = NULL;
-		}
+		$$ = new_ast_sym($2, STG_NA, SYM_UNIO_T,
+			new_ast_data(0, DATA_SUE, QUAL_NONE,
+				new_ast_sue(DATA_UNIO, strdup($2))),
+			strdup(@2.filename), @2.first_line);
 	}
 ;
 
 field_list:
-	component_declaration {
-		$$ = new_ast_tab(scope_tab, SCOPE_STRUNIO, strdup(@1.filename), @1.first_line);
-		enter($$, $1, 0);
-	}
+	component_declaration {$$ = $1;}
 |	field_list component_declaration {
-		enter($1, $2, 0);
-		$$ = $1;
+		$$ = $2;
+		list_start($$)->prev = $1;
 	}
 ;
 
@@ -657,9 +618,10 @@ component_declaration:
 	type_spec component_declarator_list ';' {
 		ast_sym_t *temp = $2;
 		while (temp != NULL) {
-			temp->tail = install_tail(temp->data, $1);
-			temp = temp->next;
+			temp->tail = install_tail(temp, copy_ast_data($1->data, -1));
+			temp = temp->prev;
 		}
+		del_ast_sym($1);
 		$$ = $2;
 	}
 ;
@@ -668,29 +630,32 @@ component_declarator_list:
 	component_declarator {$$ = $1;}
 |	component_declarator_list ',' component_declarator {
 		$$ = $3;
-		$$->next = $1;
+		list_start($$)->prev = $1;
 	}
 ;
 
-// bit field width should be constant expression, not NUM
+// bit fields not implemented, widths should support exprs
 component_declarator:
 	declarator {$$ = $1;}
-|	':' NUM {/*bit fields not implemented*/}
-|	declarator ':' NUM {$$ = $1; /*bit fields not implemented*/}
+|	':' NUM {
+		$$ = new_ast_sym(NULL, STG_NA, SYM_NONE, NULL,
+			strdup(@2.filename), @2.first_line);
+	}
+|	declarator ':' NUM {$$ = $1;}
 ;
 
 // for casts and sizeof
-type_name:
-	declaration_spec {
-		$$ = $1->data;
-		free($1); // not entering symbol table
-	}
-|	declaration_spec abstract_declarator {
-		install_tail($2, $1->data);
-		free($1); // not entering symbol table
-		$$ = $2;
-	}
-;
+// type_name:
+// 	declaration_spec {
+// 		$$ = $1->data;
+// 		free($1);
+// 	}
+// |	declaration_spec abstract_declarator {
+// 		install_tail($2, $1->data);
+// 		free($1);
+// 		$$ = $2;
+// 	}
+// ;
 
 // declarators
 
@@ -698,7 +663,7 @@ init_declarator_list:
 	init_declarator {$$ = $1;}
 |	init_declarator_list ',' init_declarator {
 		$$ = $3;
-		$$->next = $1;
+		list_start($$)->prev = $1;
 	}
 ;
 
@@ -710,7 +675,7 @@ init_declarator:
 declarator:
 	direct_declarator {$$ = $1;}
 |	pointer direct_declarator {
-		$2->tail = install_tail($2->tail, $1);
+		$2->tail = install_tail($2, $1);
 		$$ = $2;
 	}
 ;
@@ -719,11 +684,11 @@ pointer:
 	'*' qual_spec_list	{
 		$$ = new_ast_data(sizeof (void *), DATA_PTR, $2,
 			new_ast_ptr(NULL));
-		}
+	}
 |	'*' qual_spec_list pointer	{
 		$$ = new_ast_data(sizeof (void *), DATA_PTR, $2,
 			new_ast_ptr($3));
-		}
+	}
 ;
 
 qual_spec_list:
@@ -732,71 +697,76 @@ qual_spec_list:
 ;
 
 direct_declarator:
-	IDENT	{$$ = new_ast_sym($1, STG_NONE, SYM_NONE, NULL, strdup(@1.filename), @1.first_line);}
+	IDENT	{
+		$$ = new_ast_sym($1, STG_NONE, SYM_NONE, NULL,
+			strdup(@1.filename), @1.first_line);
+	}
 |	'(' declarator ')'	{$$ = $2;}
 |	array_declarator	{$$ = $1;}
 |	function_declarator	{$$ = $1;}
 ;
 
+// direct_decl[expr] not implemented here
 array_declarator:
 	direct_declarator '[' num_opt ']' {
-		$1->tail = install_tail($1->tail,
+		$$ = $1;
+		$$->tail = install_tail($1,
 			new_ast_data(0, DATA_ARY, QUAL_NONE,
 				new_ast_ary($3, NULL)));
-		$$ = $1;
 	}
-// |	direct_declarator '[' expr ']' // should be expression ast
 ;
 
 function_declarator:
-	direct_declarator '(' param_type_list_opt ')' {
-		$1->tail = install_tail($1->tail,
-			new_ast_data(0, DATA_FUNC, QUAL_NONE,
-				new_ast_func(0, NULL, $3)));
+	direct_declarator '(' ')' {
 		$$ = $1;
+		$$->tail = install_tail($1,
+			new_ast_data(0, DATA_FUNC, QUAL_NONE,
+				new_ast_func(0, 0, NULL, NULL)));
+	}
+|	direct_declarator '(' param_list ')' {
+		$$ = $1;
+		$$->tail = install_tail($1,
+			new_ast_data(0, DATA_FUNC, QUAL_NONE,
+				new_ast_func(0, 0, NULL, $3)));
+	}
+|	direct_declarator '(' param_list ',' ELLIPSIS ')' {
+		$$ = $1;
+		$$->tail = install_tail($1,
+			new_ast_data(0, DATA_FUNC, QUAL_NONE,
+				new_ast_func(0, 1, NULL, $3)));
 	}
 // |	direct_declarator '(' ident_list ')' // k&r optional syntax
 ;
 
-param_type_list_opt:
-	%empty	{$$ = NULL;}
-|	param_type_list	{$$ = $1;}
-;
-
-param_type_list:
-	param_list	{$$ = $1;}
-|	param_list ',' ELLIPSIS {$$ = $1; $$->scope_type = SCOPE_VUNC;}
-;
-
 param_list:
-	param_declaration {
-		$$ = new_ast_tab(scope_tab, SCOPE_FUNC, strdup(@1.filename), @1.first_line);
-		enter($$, $1, 0);
-	}
+	param_declaration {$$ = $1;}
 |	param_list ',' param_declaration {
-		$$ = $1;
-		enter($$, $3, 0);
+		$$ = $3;
+		list_start($$)->prev = $1;
 	}
 ;
 
 param_declaration:
 	declaration_spec param_declarator {
+		$$ = $2;
 		if ($1->stg_type == STG_REGISTER) {
-			$2->stg_type = STG_REGISTER;
+			$$->stg_type = STG_REGISTER;
 		} else {
-			$2->stg_type = STG_AUTO_PAR;
+			$$->stg_type = STG_AUTO_PAR;
 			if ($1->stg_type != STG_NONE) {
 				/*ERROR invalid stg class for parameter*/
 			}
 		}
-		$2->sym_type = SYM_PARAM;
-		$2->tail = install_tail($2->data, $1->data);
+		$$->sym_type = SYM_PARAM;
+		$$->sco_type = SCO_PROTO;
+		$$->tail = install_tail($$, $1->data);
 		del_ast_sym($1);
 	}
 |	declaration_spec {
-		$1->stg_type = STG_AUTO_PAR;
-		$1->sym_type = SYM_PARAM;
 		$$ = $1;
+		$$->stg_type = STG_AUTO_PAR;
+		$$->sym_type = SYM_PARAM;
+		$$->sco_type = SCO_PROTO;
 	}
 ;
 
@@ -811,8 +781,8 @@ abstract_declarator:
 			strdup(@1.filename), @1.first_line);
 	}
 |	pointer direct_abstract_declarator {
-		$2->tail = install_tail($2->tail, $1);
 		$$ = $2;
+		$$->tail = install_tail($$, $1);
 	}
 |	direct_abstract_declarator {$$ = $1;}
 ;
@@ -826,21 +796,27 @@ direct_abstract_declarator:
 			strdup(@1.filename), @1.first_line);
 	}
 |	direct_abstract_declarator '[' num_opt ']'  {
-		$1->tail = install_tail($1->tail,
+		$1->tail = install_tail($1,
 			new_ast_data(0, DATA_ARY, QUAL_NONE,
 				new_ast_ary($3, NULL)));
 		$$ = $1;
 	}
-|	'(' param_type_list_opt ')' {
+|	'(' ')' {
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_FUNC, QUAL_NONE,
-				new_ast_func(0, NULL, $2)),
+				new_ast_func(0, 0, NULL, NULL)),
 			strdup(@1.filename), @1.first_line);
 	}
-|	direct_abstract_declarator '(' param_type_list_opt ')' {
-		$1->tail = install_tail($1->tail,
+|	'(' param_list ')' {
+		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
 			new_ast_data(0, DATA_FUNC, QUAL_NONE,
-				new_ast_func(0, NULL, $3)));
+				new_ast_func(0, 0, NULL, $2)),
+			strdup(@1.filename), @1.first_line);
+	}
+|	direct_abstract_declarator '(' param_list ',' ELLIPSIS ')' {
+		$1->tail = install_tail($1,
+			new_ast_data(0, DATA_FUNC, QUAL_NONE,
+				new_ast_func(0, 1, NULL, $3)));
 		$$ = $1;
 	}
 ;

@@ -3,6 +3,10 @@
 
 #include "symbol.h"
 #include "data.h"
+#include "symtab_output.h"
+
+typedef struct ast_sym ast_sym_t;
+typedef struct ast_data ast_data_t;
 
 enum ns_type {
     NS_MISC = 0,
@@ -11,16 +15,17 @@ enum ns_type {
     NS_LABEL
 };
 
+typedef struct ast_cell {
+    char is_deleted;
+    ast_sym_t *sym;
+} ast_cell_t;
+
 typedef struct ast_tab {
     unsigned int size;
     unsigned int filled;
     ast_cell_t **cells;
 } ast_tab_t;
 
-typedef struct ast_cell {
-    char is_deleted;
-    ast_sym_t *sym;
-} ast_cell_t;
 
 // Returns the namespace to which sym_type belongs.
 int get_namespace(int sym_type);
@@ -70,9 +75,28 @@ int set_sym(ast_tab_t *tab, ast_sym_t *sym);
 // passed and whose scope is the smallest scope which
 // contains start and end with sym. Returns 0 on success,
 // -1 if no such symbol existed.
-int remove(ast_tab_t *tab, char *key, char namespace, int start, int end);
+int remove_sym(ast_tab_t *tab, char *key, char namespace, int start, int end);
 
 // Deletes the symbol table and all that it contains.
 int del_table(ast_tab_t *tab);
+
+// Returns a prime number of magnitude greater than or equal
+// to the size passed, or -1 if that would be too big.
+int sizeup(unsigned int size);
+
+// A simple hash function based on a symbol's name (key) and
+// its namespace.
+unsigned int hash(ast_tab_t *tab, char *key, char namespace);
+// Returns -1 if a symbol with the specified key and
+// namespace and whose scope is or surrounds that defined
+// by start and end does not exist, or the cell array index
+// of the symbol whose scope most closely fits start and end
+// if otherwise.
+unsigned int locate(ast_tab_t *tab, char *key, char namespace, int start, int end);
+
+// Increases the size of our table to the next size returned
+// by sizeup and reinserts only the non-deleted cells.
+int rehash(ast_tab_t *tab);
+
 
 #endif // TABLE_H

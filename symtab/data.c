@@ -306,7 +306,7 @@ ast_data_t *comb_ast_data(ast_data_t *src, ast_data_t *targ) {
             
             if (comb->node->func->is_complete == 1) {
                 /*ERROR function already defined*/
-                del_ast_sym(comb);
+                del_ast_data(comb);
                 return NULL;
             }
 

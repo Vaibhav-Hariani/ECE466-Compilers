@@ -3,6 +3,8 @@
 
 #include "symbol.h"
 
+typedef struct ast_sym ast_sym_t;
+
 enum data_type {
     DATA_NONE = 0,
     DATA_SCAL,
