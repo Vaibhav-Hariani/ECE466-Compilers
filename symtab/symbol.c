@@ -1,8 +1,7 @@
 #include "symbol.h"
-#include "symtab.tab.h"
 
 ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
-    ast_data_t *data, char *filename, int start){
+        ast_data_t *data, char *filename, int start){
     ast_sym_t *sym;
 
     sym = calloc(1, sizeof(ast_sym_t));
@@ -195,6 +194,9 @@ int union_fix(ast_data_t *data) {
 }
 
 ast_data_t *get_tail(ast_data_t *data) {
+    if (data == NULL) {
+        return NULL;
+    }
     switch(data->data_type) {
         case DATA_PTR:
             return (data->node->ptr->to == NULL)? data : get_tail(data->node->ptr->to);
@@ -210,8 +212,8 @@ ast_data_t *get_tail(ast_data_t *data) {
 ast_data_t *install_tail(ast_sym_t *sym, ast_data_t *tail) {
     if (sym->tail == NULL) {
         sym->data = tail;
-        sym->tail = tail;
-        return tail;
+        sym->tail = get_tail(tail);
+        return sym->tail;
     }
 
     switch (sym->tail->data_type) {

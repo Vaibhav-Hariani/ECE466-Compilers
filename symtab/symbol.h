@@ -8,6 +8,7 @@
 #include "yylval.h"
 #include "data.h"
 #include "table.h"
+#include "symtab.tab.h"
 
 typedef struct ast_data ast_data_t;
 typedef struct ast_tab ast_tab_t;

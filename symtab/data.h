@@ -2,6 +2,7 @@
 #define DATA_H
 
 #include "symbol.h"
+#include "symtab.tab.h"
 
 typedef struct ast_sym ast_sym_t;
 

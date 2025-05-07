@@ -161,12 +161,12 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
 
 int insert_list(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup) {
     int fails;
-
+    
     if (sym == NULL) {
         return 0;
     }
 
-    fails = insert(tab, sym->prev, sco_type, end, replace_dup);
+    fails = insert_list(tab, sym->prev, sco_type, end, replace_dup);
     fails += (insert(tab, sym, sco_type, end, replace_dup) != 0);
 
     return fails;

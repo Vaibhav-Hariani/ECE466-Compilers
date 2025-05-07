@@ -143,40 +143,7 @@ ast_data_t *new_ast_data(int size, char data_type, char qual, union ast_type *no
     data->size = size;
     data->data_type = data_type;
     data->qual = qual;
-    
-    switch (data_type) {
-        case DATA_SCAL:
-            data->node->scal = node->scal;
-            break;
-        case DATA_PTR:
-            data->node->ptr = node->ptr;
-            break;
-        case DATA_ARY:
-            data->node->ary = node->ary;
-            break;
-        case DATA_FUNC:
-            data->node->func = node->func;
-            break;
-        case DATA_PARAM:
-            data->node->param = node->param;
-            break;
-        case DATA_SUE:
-            data->node->sue = node->sue;
-            break;
-        case DATA_STRU:
-            data->node->stru = node->stru;
-            break;
-        case DATA_UNIO:
-            data->node->unio = node->unio;
-            break;
-        case DATA_ENU:
-            data->node->enu = node->enu;
-            break;
-        case DATA_LABEL:
-            data->node->label = node->label;
-            break;
-    }
-
+    data->node = node;
     return data;
 }
 

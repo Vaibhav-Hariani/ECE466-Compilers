@@ -4,6 +4,7 @@
 #include "symbol.h"
 #include "data.h"
 #include "symtab_output.h"
+#include "symtab.tab.h"
 
 typedef struct ast_sym ast_sym_t;
 typedef struct ast_data ast_data_t;
