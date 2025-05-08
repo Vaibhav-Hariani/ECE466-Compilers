@@ -229,115 +229,103 @@ int comp_set_max(int *src, int *targ, char *warn) {
     return 0;
 }
 
-ast_data_t *comb_ast_data(ast_data_t *src, ast_data_t *targ) {
+ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
     char warn; // warn = 1 if by the end, we have implicit conversion
-    ast_data_t *comb, *comb_param_data;
-    ast_sym_t *comb_param, *src_param;
+    ast_sym_t *new_param, *old_param;
     
     warn = 0;
-    comb = copy_ast_data(targ, 1);
-
-    switch (comb->data_type) {
+    switch (new->data_type) {
         case DATA_SCAL: // h&s 5.11.1
-            if (src->data_type == DATA_ENU && comb->node->scal->scal_type == SCAL_INT) {
-                // nonstandard but mentioned in h&s 5.11.2, works when enums, ints same
-                // same condition reflected in DATA_ENU case below
-                break; // no error
-            }
-            if (src->data_type != DATA_SCAL
-            || comb->node->scal->scal_type != src->node->scal->scal_type
-            || comb->node->scal->unsign != src->node->scal->unsign) {
+            if (old->data_type != DATA_SCAL
+            || new->node->scal->scal_type != old->node->scal->scal_type
+            || new->node->scal->unsign != old->node->scal->unsign) {
                 /*ERROR incompatible scalar types*/
-                del_ast_data(comb);
+                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_PTR:
-            if (src->data_type != DATA_PTR
-            || (comb->node->ptr->to = comb_ast_data(src->node->ptr->to, comb->node->ptr->to)) == NULL) {
+            if (old->data_type != DATA_PTR
+            || comb_ast_data(old->node->ptr->to, new->node->ptr->to) == NULL) {
                 /*ERROR incompatible pointer types*/
-                del_ast_data(comb);
+                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_ARY: // h&s 5.11.3
-            if (src->data_type != DATA_ARY
-            || comp_set_max(&src->node->ary->size, &targ->node->ary->size, &warn) == -1
-            || (comb->node->ary->elem = comb_ast_data(src->node->ary->elem, comb->node->ary->elem)) == NULL) {
+            if (old->data_type != DATA_ARY
+            || comp_set_max(&old->node->ary->size, &new->node->ary->size, &warn) == -1
+            || comb_ast_data(old->node->ary->elem, new->node->ary->elem) == NULL) {
                 /*ERROR incompatible array types*/
-                del_ast_data(comb);
+                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_FUNC: // h&s 5.11.4, prototype forms only
-            
-            if (comb->node->func->is_complete == 1) {
+            if (new->node->func->is_complete == 1) {
                 /*ERROR function already defined*/
-                del_ast_data(comb);
+                del_ast_data(new);
                 return NULL;
             }
 
-            if (src->data_type != DATA_FUNC
-            || comb->node->func->is_variadic != src->node->func->is_variadic
-            || (comb->node->func->ret = comb_ast_data(src->node->func->ret, comb->node->func->ret)) == NULL) {
+            if (old->data_type != DATA_FUNC
+            || new->node->func->is_variadic != old->node->func->is_variadic
+            || comb_ast_data(old->node->func->ret, new->node->func->ret) == NULL) {
                 /*ERROR incompatible function types*/
-                del_ast_data(comb);
+                del_ast_data(new);
                 return NULL;
             }
 
-            comb_param = comb->node->func->params;
-            src_param = src->node->func->params;
-            while (comb_param != NULL && src_param != NULL) {
-                comb_param_data = comb_ast_data(comb_param->data, src_param->data);
-                if (comb_param_data == NULL) {
+            old_param = old->node->func->params;
+            new_param = new->node->func->params;
+            while (old_param != NULL && new_param != NULL) {
+                comb_ast_data(old_param->data, new_param->data);
+                if (new_param->data == NULL) {
                     /*ERROR incompatible parameter types*/
-                    del_ast_data(comb);
+                    del_ast_data(new);
                     return NULL;
                 }
-                comb_param->data = comb_param_data;
-                comb_param = comb_param->prev;
-                src_param = src_param->prev;
+                new_param = new_param->prev;
+                old_param = old_param->prev;
             }
 
-            if (comb_param != src_param) {
+            if (new_param != old_param) {
                 /*ERROR incompatible function types, different number of parameters*/
-                del_ast_data(comb);
+                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_PARAM:
-            if (src->data_type != DATA_PARAM
-            || (comb->node->param->is = comb_ast_data(src->node->param->is, comb->node->param->is)) == NULL) {
+            if (old->data_type != DATA_PARAM
+            || comb_ast_data(old->node->param->is, new->node->param->is) == NULL) {
                 /*ERROR incompatible parameter types*/
-                del_ast_data(comb);
+                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_STRU:
-            if (comb->node->stru->tag != src->node->stru->tag) {
+            if (new->node->stru->tag != old->node->stru->tag) {
                 /*ERROR incompatible struct types*/
-                del_ast_data(comb);
+                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_UNIO:
-            if (comb->node->unio->tag != src->node->unio->tag) {
+            if (new->node->unio->tag != old->node->unio->tag) {
                 /*ERROR incompatible union types*/
-                del_ast_data(comb);
+                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_ENU: // h&s 5.11.2
-            if (src->data_type != DATA_ENU
-            && !(src->data_type == DATA_SCAL && src->node->scal->scal_type == SCAL_INT)) {
-                /*ERROR type incompatible with enum*/
-                del_ast_data(comb);
+            if (new->node->enu->tag != old->node->enu->tag) {
+                /*ERROR conflicting enum types*/
+                del_ast_data(new);
                 return NULL;
             }
             break;
     }
-    
-    return comb;
+    return new;
 }
 
 int del_ast_data(ast_data_t *data) {

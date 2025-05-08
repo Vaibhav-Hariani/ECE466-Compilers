@@ -31,9 +31,28 @@ ast_tab_t *new_table(unsigned int min_size) {
     return tab;
 }
 
+void print_insertion(ast_sym_t *sym) {
+    switch (sym->sym_type) {
+        case SYM_VAR:
+        case SYM_FUNC:
+            print_sym_decl(sym, 0);
+            break;
+        case SYM_STRU_T:
+            if (sym->data->node->stru->is_complete) {
+                print_obj_def(sym, 0);
+            }
+            break;
+        case SYM_UNIO_T:
+            if (sym->data->node->unio->is_complete) {
+                print_obj_def(sym, 0);
+            }
+            break;
+    }
+}
+
 int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup) {
     int i;
-    ast_data_t *comb;
+    ast_data_t *comb, *head;
     ast_sym_t *tag;
 
     if (tab->filled * 2 >= tab->size) {
@@ -55,32 +74,18 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
     if (sym->tail->data_type == DATA_SUE
     && sym->tail->node->sue->name != NULL) {
 
-        // insert new incomplete type if struct/union/enum tag not resolved
-        if (resolve_tag(tab, sym) == NULL) {
-            switch (sym->tail->node->sue->data_type) {
-                case DATA_STRU:
-                    tag = new_ast_sym(sym->tail->node->sue->name, STG_NA, SYM_STRU_T, 
-                        new_ast_data(0, DATA_STRU, QUAL_NONE,
-                            new_ast_stru(0, NULL, NULL)),
-                        sym->filename, end);
-                    tag->data->node->stru->tag = tag;
-                    break;
-                case DATA_UNIO:
-                    tag = new_ast_sym(sym->tail->node->sue->name, STG_NA, SYM_UNIO_T, 
-                        new_ast_data(0, DATA_UNIO, QUAL_NONE,
-                            new_ast_unio(0, NULL, NULL)),
-                        sym->filename, end);
-                    tag->data->node->unio->tag = tag;
-                    break;
-                case DATA_ENU:
-                    tag = new_ast_sym(sym->tail->node->sue->name, STG_NA, SYM_ENU_T, 
-                        new_ast_data(0, DATA_ENU, QUAL_NONE,
-                            new_ast_enu(0, NULL)),
-                        sym->filename, end);
-                    tag->data->node->enu->tag = tag;
-                    break;
-            }
-            insert(tab, tag, sco_type, end, replace_dup);
+        if ((tag = resolve_tag(tab, sym)) == NULL) {
+            // ERROR unknown struct/union/enum type
+        } else if (((tag->sym_type == SYM_STRU_T
+        && tag->data->node->stru->is_complete == 0)
+        || (tag->sym_type == SYM_UNIO_T
+        && tag->data->node->unio->is_complete == 0)
+        || (tag->sym_type == SYM_ENU_T
+        && tag->data->node->enu->is_complete == 0))
+        && ((head = get_tail_head(sym->data, sym->tail)) == NULL
+        || head->data_type != DATA_PTR)) {
+            // ERROR struct/union/enum type incomplete
+            return 3;
         }
     }
 
@@ -92,36 +97,33 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
             
             // sym is a definition for an incomplete struct/union/enum
             if ((tab->cells[i]->sym->sym_type == SYM_STRU_T
-                && sym->sym_type == SYM_STRU_T
-                && tab->cells[i]->sym->data->node->stru->is_complete == 0)
+            && sym->sym_type == SYM_STRU_T
+            && tab->cells[i]->sym->data->node->stru->is_complete == 0)
             ||  (tab->cells[i]->sym->sym_type == SYM_UNIO_T
-                && sym->sym_type == SYM_UNIO_T
-                && tab->cells[i]->sym->data->node->unio->is_complete == 0)
+            && sym->sym_type == SYM_UNIO_T
+            && tab->cells[i]->sym->data->node->unio->is_complete == 0)
             ||  (tab->cells[i]->sym->sym_type == SYM_ENU_T
-                && sym->sym_type == SYM_ENU_T
-                && tab->cells[i]->sym->data->node->enu->is_complete == 0)) {
+            && sym->sym_type == SYM_ENU_T
+            && tab->cells[i]->sym->data->node->enu->is_complete == 0)) {
                 del_ast_sym(tab->cells[i]->sym);
                 tab->cells[i]->sym = sym;
                 print_obj_def(sym, 0);
                 return 0;
             }
 
-            if (replace_dup) {
+            if (replace_dup
+            && (tab->cells[i]->sym->stg_type == STG_EXTERN_EXP
+            || tab->cells[i]->sym->stg_type == STG_EXTERN_IMP)
+            && (comb_ast_data(tab->cells[i]->sym->data, comb = copy_ast_data(sym->data, -1))) != NULL) {
                 // external redefinitions h&s 4.2.5
-                if ((tab->cells[i]->sym->stg_type == STG_EXTERN_EXP ||
-                    tab->cells[i]->sym->stg_type == STG_EXTERN_IMP)
-                && (comb = comb_ast_data(sym->data, tab->cells[i]->sym->data)) != NULL) {
-                    del_ast_data(tab->cells[i]->sym->data);
-                    tab->cells[i]->sym->data = comb;
-                    free(tab->cells[i]->sym->filename);
-                    tab->cells[i]->sym->filename = strdup(sym->filename);
-                    tab->cells[i]->sym->start = sym->start;
-                    del_ast_sym(sym);
-                } else {
-                        /*ERROR conflicting types*/
-                        del_ast_sym(sym);
-                        return 1;
-                }
+                del_ast_data(tab->cells[i]->sym->data);
+                tab->cells[i]->sym->data = comb;
+                free(tab->cells[i]->sym->filename);
+                tab->cells[i]->sym->filename = strdup(sym->filename);
+                tab->cells[i]->sym->start = sym->start;
+                del_ast_sym(sym);
+                print_insertion(tab->cells[i]->sym);
+                return 0;
             } else {
                 // ERROR symbol already defined, cant replace
                 del_ast_sym(sym);
@@ -134,28 +136,7 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
     tab->cells[i] = calloc(1, sizeof (ast_cell_t));
     tab->cells[i]->sym = sym;
     tab->filled++;
-
-    // output
-    switch (sym->sym_type) {
-        case SYM_VAR:
-            print_sym_decl(sym, 0);
-            break;
-        case SYM_FUNC:
-            if (sym->data->node->func->is_complete) {
-                print_sym_decl(sym, 0);
-            }
-        case SYM_STRU_T:
-            if (sym->data->node->stru->is_complete) {
-                print_obj_def(sym, 0);
-            }
-            break;
-        case SYM_UNIO_T:
-            if (sym->data->node->unio->is_complete) {
-                print_obj_def(sym, 0);
-            }
-            break;
-    }
-
+    print_insertion(sym);
     return 0;
 }
 

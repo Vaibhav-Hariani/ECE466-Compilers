@@ -125,6 +125,10 @@ int struct_fix(ast_data_t *data);
 // unions of its own type, nested definitions.
 int union_fix(ast_data_t *data);
 
+// Finds the parent type of tail in the multi-layer data
+// type data, returning NULL if no parent type found. 
+ast_data_t *get_tail_head(ast_data_t *data, ast_data_t *tail);
+
 // Finds the tail of the (potentially) multi-layer data type
 // data. 
 ast_data_t *get_tail(ast_data_t *data);

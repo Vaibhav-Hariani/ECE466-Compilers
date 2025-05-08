@@ -141,10 +141,10 @@ ast_data_t *new_ast_data(int size, char data_type, char qual, union ast_type *no
 // shallow copied to preserve type compatibility.
 ast_data_t *copy_ast_data(ast_data_t *data, int depth);
 
-// Dynamically allocates and creates a pointer to the
-// composite type for src and target if both are compatible.
-// Returns NULL if no such type could be created.
-ast_data_t *comb_ast_data(ast_data_t *src, ast_data_t *target);
+// Converts new to the composite type for old and new if
+// both are compatible. Returns NULL if no such type could
+// be created, but runs the risk of modifying new.
+ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new);
 
 // Recursively frees data type pointed to by data.
 int del_ast_data(ast_data_t *data);

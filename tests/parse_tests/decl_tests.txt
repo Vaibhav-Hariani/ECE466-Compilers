@@ -3,8 +3,13 @@ struct a {int b, c;};
 
 int x, y[120];
 static char ***z;
+int ***hello[];
+int ***hello[25];
 
 volatile struct a sclomp;
 
 extern union {int b; char c;} jonkler;
-static const struct doesnt_exist *jangler;
+
+struct doesnt_exist;
+signed char jongo;
+static const struct doesnt_exist jangler;

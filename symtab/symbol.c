@@ -195,20 +195,24 @@ int union_fix(ast_data_t *data) {
     return union_fix_memb(data, data->node->unio->membs);
 }
 
-ast_data_t *get_tail(ast_data_t *data) {
-    if (data == NULL) {
+ast_data_t *get_tail_head(ast_data_t *data, ast_data_t *tail) {
+    if (data == tail) {
         return NULL;
     }
     switch(data->data_type) {
         case DATA_PTR:
-            return (data->node->ptr->to == NULL)? data : get_tail(data->node->ptr->to);
+            return (data->node->ptr->to == tail)? data : get_tail_head(data->node->ptr->to, tail);
         case DATA_ARY:
-            return (data->node->ary->elem == NULL)? data : get_tail(data->node->ary->elem);
+            return (data->node->ary->elem == tail)? data : get_tail_head(data->node->ary->elem, tail);
         case DATA_FUNC:
-            return (data->node->func->ret == NULL)? data : get_tail(data->node->func->ret);
+            return (data->node->func->ret == tail)? data : get_tail_head(data->node->func->ret, tail);
         default:
             return data;
     }
+}
+
+ast_data_t *get_tail(ast_data_t *data) {
+    return get_tail_head(data, NULL);
 }
 
 ast_data_t *install_tail(ast_sym_t *sym, ast_data_t *tail) {
@@ -232,6 +236,6 @@ ast_data_t *install_tail(ast_sym_t *sym, ast_data_t *tail) {
             break;
     }
 
-    sym->tail = tail;
-    return tail;
+    sym->tail = get_tail(tail);
+    return sym->tail;
 }
