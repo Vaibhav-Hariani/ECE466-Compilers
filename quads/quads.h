@@ -49,7 +49,7 @@ struct quad {
 } typedef quad;
 
 struct big_block {
-    //Array of pointers to quads
+    //Array of pointers
     quad** quads;
     int num_el;
     int block_ind;

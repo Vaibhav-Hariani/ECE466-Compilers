@@ -1,12 +1,13 @@
 #include "quads.h"
 
 #define new_quad calloc(1,sizeof(quad))
-#define new_block calloc(1,sizeof( big_block))
 
 big_block* new_block(){
-  calloc(1, sizeof(big_))
+  big_block* new_block = calloc(1, sizeof(big_block));
+  new_block->quads = malloc(1*sizeof(quad*));
 }
 
+//Creates a tmp node, and increments tmp_ctr
 struct gen_node_t* new_tmp(int tmp_ctr){
     struct gen_node_t* node = calloc(1, sizeof(struct gen_node_t));
     node->type = TMP;
@@ -45,8 +46,7 @@ big_block* assignment_block(struct assign d, int* tmp_ctr){
         final_quad->op = rblock->quads[rblock->num_el-1];
     }
       
-
-    if(d.lvalue->type == IDENT){      
+    if(d.lvalue->type == IDENT ){      
       // final_quad->destination = d.lvalue->obj.ident;
       final_quad = (rblock->quads) + rblock->num_el - 1;
       if(final_quad->destination->type==TMP){
@@ -73,62 +73,69 @@ big_block* assignment_block(struct assign d, int* tmp_ctr){
 
 
 //Appends the quads from new to the end of ref.
-//Also allocates space for an extra quad, to save an extra realloc call
+// Also allocates space for an extra quad, to save an extra realloc call
 struct gen_node_t* append(big_block* ref, big_block* new){
   //Get the node where the output of new is stored
-  struct gen_node_t* final = new->quads[new->num_el-1].destination;
-  int new_num = ref->num_el + new->num_el + 1;
+  struct gen_node_t* final = (new->quads[new->num_el])->destination;
+  int new_num = ref->num_el + new->num_el;
   quad* new_head = realloc(ref->quads, sizeof(quad) * new_num);
   ref->quads = new_head;
   quad* tail = (ref->quads + ref->num_el);
   //Move all elements in new to ref
   memcpy(new->quads, tail, new->num_el *sizeof(quad));
-  //This is currently ahead by one
-  //There is an empty space at the end of the array
+ 
   ref->num_el = new_num;
-
   //Free the memory for the old big block and quad array;
   free(new->quads);
   free(new);
   return final;
 }
 
-struct big_block* descend_ast(ast_node* node, int* tmp_ctr){
-  // struct quad_ref* ret = calloc(1,sizeof(struct quad_ref));
-  
-  // struct quad_ref* l_block = descend_ast(node->obj.b->expr_1, tmp_ctr);
-  // struct  quad_ref* r_block = descend_ast(node->obj.b->expr_2, tmp_ctr++);
+struct gen_node_t* get_element(ast_node* node, big_block* ref, int* tmp_ctr){
+  if(node->type != AST_ident) {
+    big_block* b1 = descend_ast(node,tmp_ctr);
+    return append(ref, b1);
+  } 
+  return new_var(node->obj.ident);
+}
+
+struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr){
+
+  big_block* ret = new_block; 
+  struct gen_node_t* n1;
+  struct gen_node_t* n2;
 
   switch(node->type){
-    case AST_ident:
-      ret->type = SYM;
-      ret->element.symbol = new_var(node->obj.ident);
-      break;
     case(AST_assign): 
+    struct assign* assign_el = node->obj.a;
+    if(assign_el->lvalue->type != IDENT) {
+      int op = STORE;
+      n1 = get_element(assign_el->lvalue, ret, tmp_ctr);
+    }
+
+    
+
+    n2 = get_element(assign_el->rvalue, ret, tmp_ctr);
+    
+    // Assuming that, if lvalue is not an ident, we are getting a pointer value
+    // Then, a store operation will be necessary with the output of the rvalue
+    //Otherwise, we are dealing with a pure ident, and can just replace the last stored value of n2
+
+
+    break;
 
     case(AST_binop):
-      struct binop* element = node->obj.b;
-      struct gen_node_t* n1 = malloc(sizeof(struct gen_node_t));
-      struct gen_node_t* n2 = malloc(sizeof(struct gen_node_t));
-      big_block* ret = new_block; 
+      struct binop* binop_el = node->obj.b;
+      n1 = get_element(binop_el->expr_1, ret, tmp_ctr);
+      n2 = get_element(binop_el->expr_2, ret, tmp_ctr);
+      struct gen_node_t* tmp = new_tmp(tmp_ctr);
+      (*tmp_ctr)++;
+      quad* final_quad = quad_gen(tmp, n1, n2, binop_el->opcode);
+      //This is broken, need to fix so that a final_quad can be appended
+      ret->quads[ret->num_el - 1] = final_quad;
+      break;
 
-      if(element->expr_1->type != AST_ident){        
-        big_block* b1 = descend_ast(element->expr_1,tmp_ctr);
-        n1 = append(ret, b1);
-      } else {
-        n1 = new_var(element->expr_1->obj.ident);
-      } 
-      if(element->expr_2->type != AST_ident){        
-        big_block* b1 = descend_ast(element->expr_2,tmp_ctr);
-        n2 = append(ret, b1);
-      } else {
-        n2 = new_var(element->expr_2->obj.ident);
-      } 
-
-
-       break;
-
-    default:
+      default:
       break;
   }
     return ret;     
