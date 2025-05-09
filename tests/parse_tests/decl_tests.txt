@@ -11,5 +11,6 @@ volatile struct a sclomp;
 extern union {int b; char c;} jonkler;
 
 struct doesnt_exist;
-signed char jongo;
 static const struct doesnt_exist jangler;
+signed char jongo;
+static const struct doesnt_exist *jangler;

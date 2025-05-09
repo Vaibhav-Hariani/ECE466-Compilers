@@ -30,6 +30,10 @@ ast_sym_t *copy_ast_sym(ast_sym_t *sym) {
 ast_sym_t *copy_sym_list(ast_sym_t *sym) {
     ast_sym_t *copy, *curr;
 
+    if (sym == NULL) {
+        return NULL;
+    }
+
     curr = copy_ast_sym(sym);
     copy = curr;
 
@@ -128,17 +132,18 @@ int get_align(ast_sym_t *memb, ast_sym_t *sym) {
 
 ast_sym_t *resolve_tag(ast_tab_t *tab, ast_sym_t *sym) {
     ast_sym_t *tag;
+    ast_data_t *data;
 
     tag = get_sym(tab, sym->tail->node->sue->name, NS_TAG, sym->start, sym->end);
-    if (tag != NULL && tag->data->data_type == sym->data->node->sue->data_type) {
-        sym->tail->data_type = tag->data->data_type;
-        sym->tail->size = tag->data->size;
-
+    if (tag != NULL && tag->data->data_type == sym->tail->node->sue->data_type) {
         free(sym->tail->node->sue->name);
-        free(sym->tail->node->sue);
         free(sym->tail->node);
 
-        sym->tail->node = tag->data->node;
+        data = copy_ast_data(tag->data, -1);
+        sym->tail->data_type = tag->data->data_type;
+        sym->tail->size = tag->data->size;
+        sym->tail->node = data->node;
+        free(data);
         return tag;
     }
     return NULL;

@@ -158,7 +158,6 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
     copy->size = data->size;
     copy->data_type = data->data_type;
     copy->qual = data->qual;
-
     switch (copy->data_type) {
         case DATA_SCAL:
             copy->node = new_ast_scal(

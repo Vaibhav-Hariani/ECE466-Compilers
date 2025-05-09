@@ -21,9 +21,7 @@ void str_lit();
 int literal_val(char *buf, int is_str);
 void number_val(char type);
 
-#define YY_USER_ACTION yylloc.first_line = yylloc.last_line = line;/* \
-	free(yylloc.filename); \
-	yylloc.filename = (filename == NULL)? NULL : strdup(filename);*/
+#define YY_USER_ACTION yylloc.first_line = yylloc.last_line = line;
 %}
 
 id			[A-Za-z_][A-Za-z0-9_]*
@@ -56,6 +54,10 @@ str_lit		L?\"{s_char}*\"
 preproc		"# "[0-9]+" \""(.+)\".*\n
 newline		\n
 ws			[ \t\r]+
+
+/* comments are removed by preprocessing */
+/* this is just useful during debugging */
+cmtlin		"//".*\n
 
 %%
 ";"				{return(';');}
@@ -169,6 +171,7 @@ ws			[ \t\r]+
 
 {preproc}		{/*new_filename();*/ line=1;}
 {newline}		{line++;}
+{cmtlin}		{line++;}
 {ws}			{/*empty*/}
 .				{fprintf(stderr, "%s:%d:Error:Unrecognised token %s\n", filename, line, yytext);}
 

@@ -207,6 +207,8 @@ int print_data(ast_data_t *data, int num_tabs) {
         case DATA_LABEL:
             printf("label");
             break;
+        default:
+            printf("you lose!!\n");
     }
     return 0;
 }

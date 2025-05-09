@@ -148,7 +148,6 @@ declaration_or_fndef:
 			}
 			curr = curr->prev;
 		}
-		
 
 		if (!insert_list(tab, $1, SCO_FILE, __INT_MAX__, 1)) {
 			$$ = $1;
@@ -285,6 +284,7 @@ declaration:
 			install_tail(curr, copy_ast_data($1->data, -1));
 
 			if (curr->data->data_type == DATA_SCAL && curr->data->node->scal->scal_type == SCAL_VOID) {
+				// inadequate, allows void arrays
 				fprintf(stderr, "%s:%d:Error: Cannot have type void.\n",
 					filename, @2.first_line);
 			}
