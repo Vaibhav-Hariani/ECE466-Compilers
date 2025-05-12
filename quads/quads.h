@@ -12,8 +12,32 @@ enum node_type{
 };
 
 enum QUAD_CODES{
-    STORE=0,
-    ADD
+//Simplest operations
+    Q_ADD=0,
+    Q_SUB=1,
+    Q_MUL,
+    Q_DIV,
+    Q_MOD,
+//Bitwise operations
+    Q_SHL,
+    Q_SHR,
+    Q_BAND,
+    Q_BOR,
+    Q_XOR,
+
+    Q_LOGNOT,
+    Q_LOGOR,
+    Q_LOGAND,
+
+
+    Q_EQUALS,
+
+    Q_GREATER,
+    Q_LESS,
+    //STORE writes src2 into src1, (which should also be dest)
+    Q_STORE,    
+    //Just enough for now: Super basic 
+    
 };
 
 enum scope{
