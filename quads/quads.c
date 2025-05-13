@@ -6,7 +6,6 @@ big_block* new_block() {
   big_block* new_block = calloc(1, sizeof(big_block));
   new_block->quad_head = calloc(1, sizeof(struct quad_ll));
 }
-
 // Creates a tmp node, and increments tmp_ctr
 struct gen_node_t* new_tmp(int tmp_ctr) {
   struct gen_node_t* node = calloc(1, sizeof(struct gen_node_t));
@@ -76,9 +75,15 @@ struct gen_node_t* get_element(ast_node* node, big_block* ref, int* tmp_ctr) {
   big_block* b1 = descend_ast(node, tmp_ctr);
   return append(ref, b1);
 }
+
+int parser_quad_op_conv(int parser_code){
+
+
+  return parser_code - Q_ADD;
+};
+
 // For single op instructions, a destination may be passed in which should be
 // ignored
-
 struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
   big_block* ret = new_block;
   struct gen_node_t* n1;
@@ -94,13 +99,16 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
       if (assign_el->opcode != '=' || assign_el->lvalue->type != IDENT) {
         if (assign_el->opcode == '=') {
           op = Q_STORE;
+          final_quad = quad_gen(n1, NULL, n2, op);
+          append_quad(ret, final_quad);
+
         } else {
           // QUAD_CODES has been aligned to make this operation
           // possible
           op = assign_el->opcode - PLUSEQ;
+          final_quad = quad_gen(n1, n1, n2, op);
+          append_quad(ret, final_quad);
         }
-        final_quad = quad_gen(n1, n1, n2, op);
-        append_quad(ret, final_quad);
         // Is an IDENT with an opcode '='
       } else {
         final_quad = ret->quad_tail->cur;
@@ -141,7 +149,7 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
       }
       argBegin->src1->data.c = counter;
       n1 = new_tmp(tmp_ctr);
-      n2 = new_var(funct_el->name->obj.ident);
+      n2 = new_var(funct_el->name);
       (*tmp_ctr)++;
       quad* func_call_quad = quad_gen(n1, n2, NULL, Q_CALL);
       break;

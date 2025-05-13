@@ -111,7 +111,11 @@ ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op) {
     
     case AST_funct:;
       struct funct* function = calloc(1, sizeof(struct funct));
-      function->name= expr1;
+      if(expr1->type != AST_ident) {
+        yyerror("Function Signature is not an identifier");
+        exit(1);
+      }
+      function->name= expr1->obj.ident;
       if(expr2->type !=AST_list) {
         yyerror("Function Call args are not of type list");
         exit(1);

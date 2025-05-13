@@ -59,6 +59,8 @@ enum scope{
     GLOBAL,
 };
 
+//This should be replaced with something from
+//The AST
 struct ident {
     char* label;
     enum scope scope;

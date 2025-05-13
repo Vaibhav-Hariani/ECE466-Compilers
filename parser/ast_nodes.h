@@ -49,7 +49,7 @@ struct assign {
 
 //Special struct for function calls
 struct funct {
-    ast_node* name;
+    char* name;
     struct list_node* args;
 };
 
