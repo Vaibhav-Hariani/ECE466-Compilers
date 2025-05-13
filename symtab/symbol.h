@@ -15,43 +15,43 @@ typedef struct ast_tab ast_tab_t;
 
 enum stg_type {
     STG_NONE = 0,
-    STG_EXTERN_IMP,
-    STG_EXTERN_EXP,
-    STG_STATIC,
-    STG_REGISTER,
-    STG_AUTO_LOC,
-    STG_AUTO_PAR,
-    STG_TYPEDEF,
-    STG_NA
+    STG_EXTERN_IMP = 1,
+    STG_EXTERN_EXP = 2,
+    STG_STATIC = 4,
+    STG_REGISTER = 8,
+    STG_AUTO_LOC = 16,
+    STG_AUTO_PAR = 32,
+    STG_TYPEDEF = 64,
+    STG_NA = 128
 };
 
 enum sym_type {
     SYM_NONE = 0,
     /*misc*/
-    SYM_VAR,
-    SYM_TYPEDEF,
-    SYM_FUNC,
-    SYM_ENU_C,
-    SYM_PARAM,
+    SYM_VAR = 1,
+    SYM_TYPEDEF = 2,
+    SYM_FUNC = 4,
+    SYM_ENU_C = 8,
+    SYM_PARAM = 16,
     /*tag*/
-    SYM_STRU_T,
-    SYM_UNIO_T,
-    SYM_ENU_T,
+    SYM_STRU_T = 32,
+    SYM_UNIO_T = 64,
+    SYM_ENU_T = 128,
     /*member*/
-    SYM_STRU_M,
-    SYM_UNIO_M,
+    SYM_STRU_M = 256,
+    SYM_UNIO_M = 512,
     /*label*/
-    SYM_LABEL
+    SYM_LABEL = 1024
 };
 
 enum sco_type {
     SCO_NONE = 0,
-    SCO_FILE,
-    SCO_FUNC,
-    SCO_BLOCK,
-    SCO_PROTO,
-    SCO_STRUNIO,
-    SCO_ENU
+    SCO_FILE = 1,
+    SCO_FUNC = 2,
+    SCO_BLOCK = 4,
+    SCO_PROTO = 8,
+    SCO_STRUNIO = 16,
+    SCO_ENU = 32
 };
 
 // Each symbol contains a pointer to the
@@ -68,7 +68,7 @@ typedef struct ast_sym {
 
     char *name;
     char stg_type;
-    char sym_type;
+    short sym_type;
     char sco_type;
     char is_inline;
     int offset;
@@ -80,7 +80,7 @@ typedef struct ast_sym {
 // class and data type and returns its address. Assumes name,
 // data type and filename are dynamically allocated and uses
 // their same addresses.
-ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
+ast_sym_t *new_ast_sym(char *name, char stg_type, short sym_type,
     ast_data_t *data, char *filename, int start);
 
 // Returns a deep copy of sym and all of its data type
@@ -116,14 +116,14 @@ ast_sym_t *resolve_tag(ast_tab_t *tab, ast_sym_t *sym);
 // requirements in a struct array. Handles pointers to
 // structs of its own type, nested definitions. Sets offsets
 // for all members.
-int struct_fix(ast_data_t *data);
+int struct_fix(ast_sym_t *tag, ast_data_t *data);
 
 // Sets the size of a union data type whose members are
 // stored in the union's symbol table. Pads the union such
 // that all members would meet their respective alignment
 // requirements in a union array. Handles pointers to
 // unions of its own type, nested definitions.
-int union_fix(ast_data_t *data);
+int union_fix(ast_sym_t *tag, ast_data_t *data);
 
 // Finds the parent type of tail in the multi-layer data
 // type data, returning NULL if no parent type found. 

@@ -8,9 +8,24 @@ int ***hello[25];
 
 volatile struct a sclomp;
 
-extern union {int b; char c;} jonkler;
+// extern union {int b; char c;} jonkler;
 
 struct doesnt_exist;
 static const struct doesnt_exist jangler;
 signed char jongo;
 static const struct doesnt_exist *jangler;
+
+// static int myFunc(int a, char b, char *string);
+static int myFunc(int i, char c, char *s) {
+    int new_i;
+}
+
+// struct nest {
+//     int twig_count;
+//     struct egg {
+//         int chick;
+//     } *egg_1, *egg_2, egg_3;
+//     char state, age;
+// } nest_1;
+
+int movingon;

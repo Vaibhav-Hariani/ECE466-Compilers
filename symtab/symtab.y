@@ -185,7 +185,7 @@ function_def: /*does not support k&r style*/
 
 			$2->sym_type = SYM_FUNC;
 			$2->data->node->func->is_complete = 1;
-			install_tail($2, $1->data);
+			install_tail($2, copy_ast_data($1->data, -1));
 			del_ast_sym($1);
 
 			if (!insert(tab, $2, SCO_FILE, __INT_MAX__, 1)) {	// insert function
@@ -271,12 +271,13 @@ declaration:
 |	declaration_spec init_declarator_list ';' {
 		ast_sym_t *curr;
 
+		$$ = $2;
 		if ($1->data->data_type == DATA_NONE) {
 			fprintf(stderr, "%s:%d:Error: Must specify a scalar type.\n",
 				filename, @2.first_line);
 		}
 
-		curr = $2;
+		curr = $$;
 		while (curr != NULL) {
 			curr->stg_type = $1->stg_type;
 			curr->sym_type = SYM_VAR;
@@ -291,15 +292,13 @@ declaration:
 			curr = curr->prev;
 		}
 
-		// the below is wrong, declarator's sym info should be
-		// at the END of the list; rework implementation
-		if (list_start($1)->sym_type == SYM_NONE) {
-			del_ast_sym($1); // should we do this? NO LOL
-		} else {
+		if (list_start($1)->data->data_type !=  DATA_STRU
+		&& list_start($1)->data->data_type != DATA_UNIO
+		&& list_start($1)->data->data_type != DATA_ENU) {
+			del_ast_sym($1);
+		} else if (list_start($1)->name != NULL) {
 			list_start($$)->prev = $1;
 		}
-
-		$$ = $2;
 	}
 ;
 
@@ -417,22 +416,28 @@ type_spec:
 			strdup(filename), @1.first_line);
 	}
 |	enum_type_spec	{
-		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
-			copy_ast_data(list_start($1)->data, -1),
-			strdup(filename), @1.first_line);
+		$$ = copy_ast_sym($1);
 		$$->prev = $1;
+		// $$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+		// 	copy_ast_data(list_start($1)->data, -1),
+		// 	strdup(filename), @1.first_line);
+		// $$->prev = $1;
 	}
 |	struct_type_spec	{
-		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
-			copy_ast_data(list_start($1)->data, -1),
-			strdup(filename), @1.first_line);
+		$$ = copy_ast_sym($1);
 		$$->prev = $1;
+		// $$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+		// 	copy_ast_data(list_start($1)->data, -1),
+		// 	strdup(filename), @1.first_line);
+		// $$->prev = $1;
 	}
 |	union_type_spec	{
-		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
-			copy_ast_data(list_start($1)->data, -1),
-			strdup(filename), @1.first_line);
+		$$ = copy_ast_sym($1);
 		$$->prev = $1;
+		// $$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
+		// 	copy_ast_data(list_start($1)->data, -1),
+		// 	strdup(filename), @1.first_line);
+		// $$->prev = $1;
 	}
 |	VOID	{
 		$$ = new_ast_sym(NULL, STG_NONE, SYM_NONE,
@@ -533,7 +538,7 @@ enum_type_ref:
 	ENUM IDENT	{
 		$$ = new_ast_sym($2, STG_NA, SYM_ENU_T,
 			new_ast_data(0, DATA_SUE, QUAL_NONE,
-				new_ast_sue(DATA_ENU, strdup($2))),
+				new_ast_sue(DATA_ENU, $2)),
 			strdup(filename), @2.first_line);
 	}
 ;
@@ -569,7 +574,7 @@ struct_type_def:
 			strdup(filename), @1.first_line);
 		$$->data->node->stru->tag = $$;
 
-		struct_fix($$->data);
+		struct_fix($$, $$->data);
 	}
 |	STRUCT IDENT '{' field_list '}' {
 		$$ = new_ast_sym($2, STG_NA, SYM_STRU_T, 
@@ -578,7 +583,14 @@ struct_type_def:
 			strdup(filename), @2.first_line);
 		$$->data->node->stru->tag = $$;
 
-		struct_fix($$->data);
+		// ast_sym_t *temp;
+		// temp = $4;
+		// while (temp != NULL) {
+		// 	fprintf(stderr, "struct %s has member %s, %d\n", $2, temp->name, temp->data->data_type);
+		// 	temp = temp->prev;
+		// }
+
+		struct_fix($$, $$->data);
 	}
 ;
 
@@ -586,7 +598,7 @@ struct_type_ref:
 	STRUCT IDENT	{
 		$$ = new_ast_sym($2, STG_NA, SYM_STRU_T,
 			new_ast_data(0, DATA_SUE, QUAL_NONE,
-				new_ast_sue(DATA_STRU, strdup($2))),
+				new_ast_sue(DATA_STRU, $2)),
 			strdup(filename), @2.first_line);
 	}
 ;
@@ -604,7 +616,7 @@ union_type_def:
 			strdup(filename), @1.first_line);
 		$$->data->node->unio->tag = $$;
 
-		union_fix($$->data);
+		union_fix($$, $$->data);
 	}
 |	UNION IDENT '{' field_list '}'  {
 		$$ = new_ast_sym($2, STG_NA, SYM_UNIO_T, 
@@ -613,7 +625,7 @@ union_type_def:
 			strdup(filename), @2.first_line);
 		$$->data->node->unio->tag = $$;
 
-		union_fix($$->data);
+		union_fix($$, $$->data);
 	}
 ;
 
@@ -621,7 +633,7 @@ union_type_ref:
 	UNION IDENT	{
 		$$ = new_ast_sym($2, STG_NA, SYM_UNIO_T,
 			new_ast_data(0, DATA_SUE, QUAL_NONE,
-				new_ast_sue(DATA_UNIO, strdup($2))),
+				new_ast_sue(DATA_UNIO, $2)),
 			strdup(filename), @2.first_line);
 	}
 ;
@@ -636,13 +648,23 @@ field_list:
 
 component_declaration:
 	type_spec component_declarator_list ';' {
-		ast_sym_t *temp = $2;
+		$$ = $2;
+		ast_sym_t *temp = $$;
 		while (temp != NULL) {
 			install_tail(temp, copy_ast_data($1->data, -1));
 			temp = temp->prev;
 		}
-		del_ast_sym($1);
-		$$ = $2;
+
+		if ($1->prev != NULL) {
+			list_start($$)->prev = $1->prev;
+		}
+		// if ($1->data->data_type !=  DATA_STRU
+		// && $1->data->data_type != DATA_UNIO
+		// && $1->data->data_type != DATA_ENU) {
+			del_ast_sym($1);
+		// } else if ($1->name != NULL) {
+		// 	list_start($$)->prev = $1;
+		// }
 	}
 ;
 
@@ -718,7 +740,7 @@ qual_spec_list:
 
 direct_declarator:
 	IDENT	{
-		$$ = new_ast_sym(strdup($1), STG_NONE, SYM_NONE, NULL,
+		$$ = new_ast_sym($1, STG_NONE, SYM_NONE, NULL,
 			strdup(filename), @1.first_line);
 	}
 |	'(' declarator ')'	{$$ = $2;}
@@ -766,6 +788,41 @@ param_list:
 	}
 ;
 
+/*
+
+		ast_sym_t *curr;
+
+		$$ = $2;
+		if ($1->data->data_type == DATA_NONE) {
+			fprintf(stderr, "%s:%d:Error: Must specify a scalar type.\n",
+				filename, @2.first_line);
+		}
+
+		curr = $$;
+		while (curr != NULL) {
+			curr->stg_type = $1->stg_type;
+			curr->sym_type = SYM_VAR;
+
+			install_tail(curr, copy_ast_data($1->data, -1));
+
+			if (curr->data->data_type == DATA_SCAL && curr->data->node->scal->scal_type == SCAL_VOID) {
+				// inadequate, allows void arrays
+				fprintf(stderr, "%s:%d:Error: Cannot have type void.\n",
+					filename, @2.first_line);
+			}
+			curr = curr->prev;
+		}
+
+		if (list_start($1)->data->data_type !=  DATA_STRU
+		&& list_start($1)->data->data_type != DATA_UNIO
+		&& list_start($1)->data->data_type != DATA_ENU) {
+			del_ast_sym($1);
+		} else if (list_start($1)->name != NULL) {
+			list_start($$)->prev = $1;
+		}
+	}
+*/
+
 param_declaration:
 	declaration_spec param_declarator {
 		$$ = $2;
@@ -779,7 +836,7 @@ param_declaration:
 		}
 		$$->sym_type = SYM_PARAM;
 		$$->sco_type = SCO_PROTO;
-		install_tail($$, $1->data);
+		install_tail($$, copy_ast_data($1->data, -1));
 		del_ast_sym($1);
 	}
 |	declaration_spec {

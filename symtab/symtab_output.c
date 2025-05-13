@@ -159,7 +159,7 @@ int print_data(ast_data_t *data, int num_tabs) {
             printf("function with return type\n");
             print_data(data->node->func->ret, num_tabs + 1);
             print_indent(num_tabs);
-            printf("which takes the arguments:");
+            printf("which takes the arguments:\n");
             print_params(data->node->func->params, num_tabs + 1);
             break;
         case DATA_PARAM:

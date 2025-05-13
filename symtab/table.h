@@ -29,7 +29,7 @@ typedef struct ast_tab {
 
 
 // Returns the namespace to which sym_type belongs.
-int get_namespace(int sym_type);
+int get_namespace(short sym_type);
 
 // Initialises a hash table. The default size for the
 // internal cell array is the smallest size provided

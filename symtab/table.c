@@ -1,6 +1,6 @@
 #include "table.h"
 
-int get_namespace(int sym_type) {
+int get_namespace(short sym_type) {
     switch (sym_type) {
         case SYM_VAR:
         case SYM_TYPEDEF:
@@ -49,6 +49,37 @@ void print_insertion(ast_sym_t *sym) {
             break;
     }
 }
+
+int insert_nested(ast_tab_t *tab, ast_sym_t *tag, char sco_type, int end, char replace_dup) {
+    ast_sym_t *memb;
+
+    memb = (tag->sym_type == SYM_STRU_T)
+        ? tag->data->node->stru->membs
+        : tag->data->node->unio->membs;
+    
+    while (memb != NULL) {
+        switch (memb->data->data_type) {
+            case DATA_STRU:
+                if (memb->data->node->stru->tag->name != NULL) {
+                    insert(tab, memb->data->node->stru->tag, sco_type, end, replace_dup);
+                }
+                break;
+            case DATA_UNIO:
+                if (memb->data->node->stru->tag->name != NULL) {
+                    insert(tab, memb->data->node->unio->tag, sco_type, end, replace_dup);
+                }
+                break;
+            case DATA_ENU:
+                // worse!
+                break;
+        }
+
+        memb = memb->prev;
+    }
+    return 0;
+}
+
+// int insert
 
 int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup) {
     int i;
@@ -131,6 +162,16 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
             }
         }
         i = (i == tab->size - 1)? 0 : i + 1;
+    }
+
+    // sweep through s/u field lists and handle s/u/e definitions
+    switch (sym->sym_type) {
+        case SYM_STRU_T:
+            break;
+        case SYM_UNIO_T:
+            break;
+        case SYM_ENU_T:
+            break;
     }
 
     tab->cells[i] = calloc(1, sizeof (ast_cell_t));
