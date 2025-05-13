@@ -143,7 +143,7 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
       n1 = new_tmp(tmp_ctr);
       n2 = new_var(funct_el->name->obj.ident);
       (*tmp_ctr)++;
-      quad* func_call_quad = quad_gen(n1,n2,NULL,Q_CALL);      
+      quad* func_call_quad = quad_gen(n1, n2, NULL, Q_CALL);
       break;
 
     case (AST_unop):
