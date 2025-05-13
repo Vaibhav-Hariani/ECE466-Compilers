@@ -77,7 +77,7 @@ union generic_node{
     struct ident* v; 
     struct tmp* t;
     //Assuming this is just an integer
-    int* c;
+    int c;
 };
 
 struct quad {
