@@ -151,7 +151,7 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
                 tab->cells[i]->sym->data = comb;
                 free(tab->cells[i]->sym->filename);
                 tab->cells[i]->sym->filename = strdup(sym->filename);
-                tab->cells[i]->sym->start = sym->start;
+                // tab->cells[i]->sym->start = sym->start;
                 del_ast_sym(sym);
                 print_insertion(tab->cells[i]->sym);
                 return 0;
