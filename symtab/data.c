@@ -149,15 +149,14 @@ ast_data_t *new_ast_data(int size, char data_type, char qual, union ast_type *no
 
 ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
     ast_data_t *copy;
+    ast_sym_t *temp;
 
     if (depth == 0) {
         return data;
     }
 
-    copy = calloc(1, sizeof(ast_data_t));
-    copy->size = data->size;
-    copy->data_type = data->data_type;
-    copy->qual = data->qual;
+    copy = new_ast_data(data->size, data->data_type, data->qual, NULL);
+
     switch (copy->data_type) {
         case DATA_SCAL:
             copy->node = new_ast_scal(
@@ -239,7 +238,6 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
             || new->node->scal->scal_type != old->node->scal->scal_type
             || new->node->scal->unsign != old->node->scal->unsign) {
                 /*ERROR incompatible scalar types*/
-                del_ast_data(new);
                 return NULL;
             }
             break;
@@ -247,7 +245,6 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
             if (old->data_type != DATA_PTR
             || comb_ast_data(old->node->ptr->to, new->node->ptr->to) == NULL) {
                 /*ERROR incompatible pointer types*/
-                del_ast_data(new);
                 return NULL;
             }
             break;
@@ -256,14 +253,13 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
             || comp_set_max(&old->node->ary->size, &new->node->ary->size, &warn) == -1
             || comb_ast_data(old->node->ary->elem, new->node->ary->elem) == NULL) {
                 /*ERROR incompatible array types*/
-                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_FUNC: // h&s 5.11.4, prototype forms only
-            if (new->node->func->is_complete == 1) {
+            if (old->data_type == DATA_FUNC
+            && old->node->func->is_complete == 1) {
                 /*ERROR function already defined*/
-                del_ast_data(new);
                 return NULL;
             }
 
@@ -271,7 +267,6 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
             || new->node->func->is_variadic != old->node->func->is_variadic
             || comb_ast_data(old->node->func->ret, new->node->func->ret) == NULL) {
                 /*ERROR incompatible function types*/
-                del_ast_data(new);
                 return NULL;
             }
 
@@ -281,7 +276,6 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
                 comb_ast_data(old_param->data, new_param->data);
                 if (new_param->data == NULL) {
                     /*ERROR incompatible parameter types*/
-                    del_ast_data(new);
                     return NULL;
                 }
                 new_param = new_param->prev;
@@ -290,7 +284,6 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
 
             if (new_param != old_param) {
                 /*ERROR incompatible function types, different number of parameters*/
-                del_ast_data(new);
                 return NULL;
             }
             break;
@@ -298,28 +291,24 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
             if (old->data_type != DATA_PARAM
             || comb_ast_data(old->node->param->is, new->node->param->is) == NULL) {
                 /*ERROR incompatible parameter types*/
-                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_STRU:
             if (new->node->stru->tag != old->node->stru->tag) {
                 /*ERROR incompatible struct types*/
-                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_UNIO:
             if (new->node->unio->tag != old->node->unio->tag) {
                 /*ERROR incompatible union types*/
-                del_ast_data(new);
                 return NULL;
             }
             break;
         case DATA_ENU: // h&s 5.11.2
             if (new->node->enu->tag != old->node->enu->tag) {
                 /*ERROR conflicting enum types*/
-                del_ast_data(new);
                 return NULL;
             }
             break;

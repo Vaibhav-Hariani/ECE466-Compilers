@@ -15,8 +15,8 @@ static const struct doesnt_exist jangler;
 signed char jongo;
 static const struct doesnt_exist *jangler;
 
-// static int myFunc(int a, char b, char *string);
-static int myFunc(int i, char c, char *s) {
+int myFunc(int a, char, char *string);
+int myFunc(int i, char c, char *s) {
     int new_i;
 }
 

@@ -34,6 +34,7 @@ ast_tab_t *new_table(unsigned int min_size) {
 void print_insertion(ast_sym_t *sym) {
     switch (sym->sym_type) {
         case SYM_VAR:
+        case SYM_PARAM:
         case SYM_FUNC:
             print_sym_decl(sym, 0);
             break;
@@ -47,6 +48,8 @@ void print_insertion(ast_sym_t *sym) {
                 print_obj_def(sym, 0);
             }
             break;
+        default:
+            fprintf(stderr, "set your sym_type!\n");
     }
 }
 
@@ -83,7 +86,7 @@ int insert_nested(ast_tab_t *tab, ast_sym_t *tag, char sco_type, int end, char r
 
 int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_dup) {
     int i;
-    ast_data_t *comb, *head;
+    ast_data_t *comb, *head, *temp;
     ast_sym_t *tag;
 
     if (tab->filled * 2 >= tab->size) {
@@ -147,14 +150,10 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
             || tab->cells[i]->sym->stg_type == STG_EXTERN_IMP)
             && (comb_ast_data(tab->cells[i]->sym->data, comb = copy_ast_data(sym->data, -1))) != NULL) {
                 // external redefinitions h&s 4.2.5
-                del_ast_data(tab->cells[i]->sym->data);
-                tab->cells[i]->sym->data = comb;
-                free(tab->cells[i]->sym->filename);
-                tab->cells[i]->sym->filename = strdup(sym->filename);
-                // tab->cells[i]->sym->start = sym->start;
-                del_ast_sym(sym);
-                print_insertion(tab->cells[i]->sym);
-                return 0;
+                del_ast_sym(tab->cells[i]->sym);
+                free(tab->cells[i]);
+                tab->filled--;
+                break;
             } else {
                 // ERROR symbol already defined, cant replace
                 del_ast_sym(sym);

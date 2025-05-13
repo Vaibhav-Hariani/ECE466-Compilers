@@ -142,7 +142,7 @@ int print_data(ast_data_t *data, int num_tabs) {
             break;
         case DATA_PTR:
             printf("pointer to\n");
-            print_data(data->node->ptr->to, num_tabs + 1);
+            print_data(data->node->ptr->to, num_tabs);
             break;
         case DATA_ARY:
             if (data->node->ary->size > 0) {
@@ -150,7 +150,7 @@ int print_data(ast_data_t *data, int num_tabs) {
             } else {
                 printf("ary of elements of type\n");
             }
-            print_data(data->node->ary->elem, num_tabs + 1);
+            print_data(data->node->ary->elem, num_tabs);
             break;
         case DATA_FUNC:
             if (!data->node->func->is_complete) {
@@ -164,7 +164,7 @@ int print_data(ast_data_t *data, int num_tabs) {
             break;
         case DATA_PARAM:
             printf("parameter of type\n");
-            print_data(data->node->param->is, num_tabs = 1);
+            print_data(data->node->param->is, num_tabs + 1);
             break;
         case DATA_STRU:
             if (data->node->stru->tag->name != NULL) {
@@ -242,8 +242,14 @@ int print_memb_decl(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_na
 
 int print_sym_decl(ast_sym_t *sym, int num_tabs) {
     print_indent(num_tabs);
-    printf("%s %s defined at <%s>:%d {\n",
-        (sym->sym_type == SYM_VAR)? "variable" : "function",
+    if (sym->sym_type == SYM_VAR) {
+        printf("variable ");
+    } else if (sym->sym_type == SYM_PARAM) {
+        printf("parameter ");
+    } else {
+        printf("function ");
+    }
+    printf("%s declared at <%s>:%d {\n",
         sym->name, sym->filename, sym->start);
     print_indent(num_tabs + 1);
     printf("scope:\n");
