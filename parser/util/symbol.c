@@ -107,6 +107,7 @@ int get_align(ast_sym_t *memb, ast_sym_t *sym) {
                     align = __alignof__ (char);
                     break;
             }
+            break;
         case DATA_PTR:
             align = __alignof__ (void *);
             break;
@@ -175,7 +176,6 @@ int struct_fix_memb(ast_sym_t *tag, ast_data_t *data, ast_sym_t *memb, ast_sym_t
         memb = (next == NULL)? data->node->stru->membs : next->prev;
     }
 
-    fprintf(stderr, "\tlooking at member %s, %d, %d\n", memb->name, memb->data->data_type, memb->start);
     // struct alignment and sizing, member offsetting
     memb->sym_type = SYM_STRU_M;
     max_align = struct_fix_memb(tag, data, memb->prev, memb);
@@ -183,7 +183,6 @@ int struct_fix_memb(ast_sym_t *tag, ast_data_t *data, ast_sym_t *memb, ast_sym_t
     if (align > max_align) {
         max_align = align;
     }
-    // fprintf(stderr, "\t%s align = %d\n", memb->name, align);
 
     pos_mod = (data->size-1) % align;
     pos_mod += (pos_mod < 0)? align : 0;
