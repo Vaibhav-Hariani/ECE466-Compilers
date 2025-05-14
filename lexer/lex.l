@@ -3,12 +3,13 @@
 %option noinput
 
 %{
-#include "symtab.tab.h"
-#include "yylval.h"
 #include <string.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <errno.h>
+
+#include "parser.tab.h"
+#include "yylval.h"
 
 // YYSTYPE yylval;
 // YYLTYPE yylloc;

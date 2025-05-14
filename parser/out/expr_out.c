@@ -1,10 +1,10 @@
-#include "parse_output.h"
+#include "expr_out.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "parser.tab.h"
+#include "../parser.tab.h"
 
 // Currently, string is the last token
 // Returns an array of pointers, that allows us to quickly find & fix tokens
