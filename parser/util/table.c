@@ -48,8 +48,14 @@ void print_insertion(ast_sym_t *sym) {
                 print_obj_def(sym, 0);
             }
             break;
+        case SYM_ENU_T:
+            if (sym->data->node->enu->is_complete) {
+                print_obj_def(sym, 0);
+            }
+            break;
         default:
-            fprintf(stderr, "set your sym_type!\n");
+            fprintf(stderr, "Error: Symbol type %d for symbol %s!\n", sym->sym_type, sym->name);
+            break;
     }
 }
 
@@ -98,8 +104,9 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
     sym->sco_type = sco_type; // symbol's scope
     sym->end = end; // end of the symbol's scope
 
-    // filters out anonymous struct/union/enums
-    if (get_namespace(sym->sym_type) == NS_TAG && sym->name == NULL) {
+    // filters out anonymous struct/union/enums and placeholders
+    // fprintf(stderr, "my symtype %d my name %s \n", sym->sym_type, sym->name);
+    if (sym->name == NULL || sym->data->data_type == DATA_SUE) {
         return 0;
     }
 

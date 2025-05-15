@@ -296,13 +296,10 @@ declaration:
 			curr = curr->prev;
 		}
 
-		if (list_start($1)->data->data_type !=  DATA_STRU
-		&& list_start($1)->data->data_type != DATA_UNIO
-		&& list_start($1)->data->data_type != DATA_ENU) {
-			del_ast_sym($1);
-		} else if (list_start($1)->name != NULL) {
-			list_start($$)->prev = $1;
+		if ($1->prev != NULL) {
+			list_start($$)->prev = $1->prev;
 		}
+		del_ast_sym($1);
 	}
 ;
 
@@ -561,7 +558,7 @@ enum_def_list:
 
 enum_constant_def:
 	IDENT	{$$ = $1;}
-// |	IDENT '=' expr // circle back when combining with parser
+|	IDENT '=' term_expr // circle back when combining with parser
 ;
 
 
@@ -731,8 +728,8 @@ pointer:
 ;
 
 qual_spec_list:
-	%empty {$$ = 0;}
-|	qual_spec_list qual_spec {$$ |= $1;}
+	%empty {$$ = QUAL_NONE;}
+|	qual_spec_list qual_spec {$$ |= $2;}
 ;
 
 direct_declarator:
@@ -933,10 +930,12 @@ binop_expr:
 |	binop_expr LTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, LTEQ);}
 |	binop_expr GTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, GTEQ);}
 
-ternop_expr: binop_expr { $$=$1;}
-| binop_expr '?' binop_expr ':' binop_expr	{ $$=new_ast_ternop(AST_ternop, $1, $3, $5);};
+ternop_expr:
+	binop_expr { $$=$1;}
+|	binop_expr '?' binop_expr ':' binop_expr	{ $$=new_ast_ternop(AST_ternop, $1, $3, $5);};
 
-assign_expr: ternop_expr {$$=$1;}
+assign_expr:
+	ternop_expr	{$$=$1;}
 |	unop_expr '=' assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, '=');}
 |	unop_expr TIMESEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, TIMESEQ);}
 |	unop_expr DIVEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, DIVEQ);}

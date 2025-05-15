@@ -240,6 +240,24 @@ int print_memb_decl(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_na
     return 0;
 }
 
+int print_enum_const(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_name) {
+    if (memb == NULL) {
+        return 0;
+    }
+
+    print_memb_decl(memb->prev, sym, num_tabs, data_name);
+
+    print_indent(num_tabs);
+    printf("%s %s constant %s defined at <%s>:%d {\n",
+        data_name, sym->name, memb->name, memb->filename, memb->start);
+    print_indent(num_tabs + 1);
+    printf("scope: ");
+    print_scope(memb->sco_type, memb->filename, memb->start);
+    print_indent(num_tabs + 1);
+    printf("}\n");
+    return 0;
+}
+
 int print_sym_decl(ast_sym_t *sym, int num_tabs) {
     print_indent(num_tabs);
     if (sym->sym_type == SYM_VAR) {
@@ -286,6 +304,9 @@ int print_obj_def(ast_sym_t *sym, int num_tabs) {
             data_name = strdup("union");
             membs = sym->data->node->unio->membs;
             break;
+        case SYM_ENU_T:
+            data_name = strdup("enum");
+            membs = NULL;
     }
     
     print_indent(num_tabs);
@@ -295,7 +316,10 @@ int print_obj_def(ast_sym_t *sym, int num_tabs) {
     printf("scope: ");
     print_scope(sym->sco_type, sym->filename, sym->start);
     
-    print_memb_decl(membs, sym, num_tabs + 1, data_name);
+    if (sym->sym_type != SYM_ENU_T) {
+        // structs, unions
+        print_memb_decl(membs, sym, num_tabs + 1, data_name);
+    }
 
     free(data_name);
     print_indent(num_tabs);

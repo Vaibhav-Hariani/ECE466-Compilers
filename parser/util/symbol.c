@@ -18,8 +18,9 @@ ast_sym_t *new_ast_sym(char *name, char stg_type, short sym_type,
 ast_sym_t *copy_ast_sym(ast_sym_t *sym) {
     ast_sym_t *copy;
 
-    copy = new_ast_sym(strdup(sym->name), sym->stg_type, sym->sym_type,
-        copy_ast_data(sym->data, -1), strdup(sym->filename), sym->start);
+    copy = new_ast_sym((sym->name == NULL)? NULL : strdup(sym->name),
+        sym->stg_type, sym->sym_type, copy_ast_data(sym->data, -1),
+        strdup(sym->filename), sym->start);
     copy->end = sym->end;
     copy->sco_type = sym->sco_type;
     copy->is_inline = sym->is_inline;
@@ -155,25 +156,31 @@ ast_sym_t *resolve_tag(ast_tab_t *tab, ast_sym_t *sym) {
 
 int struct_fix_memb(ast_sym_t *tag, ast_data_t *data, ast_sym_t *memb, ast_sym_t *next) {
     int pos_mod, align, max_align;
+    ast_sym_t *temp;
+
     if (memb == NULL) {
         data->size = 0;
         return 0;
     } 
     
-    // move s/u/e tags and enum constants
-    // into list of symbols we install into
-    // the same scope as tag.
+    // remove s/u/e tags and enum consts from field list
     else while (memb->sym_type & (SYM_STRU_T|SYM_UNIO_T|SYM_ENU_T|SYM_ENU_C)) {
-        fprintf(stderr, "\tskipping   member %s, %d, %d\n", memb->name, memb->data->data_type, memb->start);
-        // fprintf(stderr, "list_start(%s) = %s\n", tag->name, list_start(tag)->name);
-        list_start(tag)->prev = memb;
-        if (next == NULL) {
-            data->node->stru->membs = memb->prev;
-        } else {
-            next->prev = memb->prev;
+        temp = memb->prev;
+        
+        // move non-anon s/u/e tags and enum constants
+        // into list of symbols we install into the
+        // same scope as tag.
+        if (memb->sym_type & SYM_ENU_C || memb->name != NULL) {
+            memb->prev = tag->prev;
+            tag->prev = memb;
         }
-        memb->prev = NULL;
-        memb = (next == NULL)? data->node->stru->membs : next->prev;
+
+        memb = temp;
+        if (next == NULL) {
+            data->node->stru->membs = memb;
+        } else {
+            next->prev = memb;
+        }
     }
 
     // struct alignment and sizing, member offsetting
@@ -193,34 +200,40 @@ int struct_fix_memb(ast_sym_t *tag, ast_data_t *data, ast_sym_t *memb, ast_sym_t
 
 int struct_fix(ast_sym_t *tag, ast_data_t *data) {
     int max_align;
-    // fprintf(stderr, "im struct fixing struct %s!!!\n", tag->name);
 
     max_align = struct_fix_memb(tag, data, data->node->stru->membs, NULL);
 
-    // pad struct so members in struct arrays remain aligned
     data->size += max_align - ((data->size-1) % max_align + 1);
     return 0;
 }
 
 int union_fix_memb(ast_sym_t *tag, ast_data_t *data, ast_sym_t *memb, ast_sym_t *next) {
     int align;
+    struct ast_sym_t *temp;
+
     if (memb == NULL) {
         data->size = 0;
         return 0;
     }
     
-    // move s/u/e tags and enum constants
-    // into list of symbols we install into
-    // the same scope as tag.
+    // remove s/u/e tags and enum consts from field list
     else while (memb->sym_type & (SYM_STRU_T|SYM_UNIO_T|SYM_ENU_T|SYM_ENU_C)) {
-        list_start(tag)->prev = memb;
-        if (next == NULL) {
-            data->node->unio->membs = memb->prev;
-        } else {
-            next->prev = memb->prev;
+        temp = memb->prev;
+        
+        // move non-anon s/u/e tags and enum constants
+        // into list of symbols we install into the
+        // same scope as tag.
+        if (memb->sym_type & SYM_ENU_C || memb->name != NULL) {
+            memb->prev = tag->prev;
+            tag->prev = memb;
         }
-        memb->prev = NULL;
-        memb = (next == NULL)? data->node->unio->membs : next->prev;
+
+        memb = temp;
+        if (next == NULL) {
+            data->node->unio->membs = memb;
+        } else {
+            next->prev = memb;
+        }
     }
 
     // union alignment and sizing
@@ -234,7 +247,8 @@ int union_fix_memb(ast_sym_t *tag, ast_data_t *data, ast_sym_t *memb, ast_sym_t 
 }
 
 int union_fix(ast_sym_t *tag, ast_data_t *data) {
-    return union_fix_memb(tag, data, data->node->unio->membs, NULL);
+    int t = union_fix_memb(tag, data, data->node->unio->membs, NULL); 
+    return t;
 }
 
 ast_data_t *get_tail_head(ast_data_t *data, ast_data_t *tail) {
