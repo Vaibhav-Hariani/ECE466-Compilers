@@ -1,11 +1,11 @@
-#ifndef PARSE_OUTPUT_H
-#define PARSE_OUTPUT_H
+#ifndef EXPR_OUT_H
+#define EXPR_OUT_H
 
-#include "ast_nodes.h"
+#include "../util/expr.h"
 
 //Only function that needs to be exposed
 ast_node* print_ast(ast_node* expr);
 
 void print_recurse(ast_node* expr, int num_tabs, char** tokens);
 
-#endif // PARSE_OUTPUT_H
+#endif // EXPR_OUTPUT_H

@@ -1,16 +1,20 @@
 %option noyywrap
+%option nounput
+%option noinput
+
 %{
-#include "symtab.tab.h"
-#include "yylval.h"
 #include <string.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <errno.h>
 
+#include "parser.tab.h"
+#include "yylval.h"
+
 // YYSTYPE yylval;
 // YYLTYPE yylloc;
-// char *filename;
-// int line;
+extern char *filename;
+int line = 1;
 
 void new_filename();
 void char_lit();
@@ -18,6 +22,7 @@ void str_lit();
 int literal_val(char *buf, int is_str);
 void number_val(char type);
 
+#define YY_USER_ACTION yylloc.first_line = yylloc.last_line = line;
 %}
 
 id			[A-Za-z_][A-Za-z0-9_]*
@@ -50,6 +55,10 @@ str_lit		L?\"{s_char}*\"
 preproc		"# "[0-9]+" \""(.+)\".*\n
 newline		\n
 ws			[ \t\r]+
+
+/* comments are removed by preprocessing */
+/* this is just useful during debugging */
+cmtlin		"//".*\n
 
 %%
 ";"				{return(';');}
@@ -161,16 +170,18 @@ ws			[ \t\r]+
 {decflt}		{number_val('I');			return(NUM);}
 {hexflt}		{number_val('H');			return(NUM);}
 
-{preproc}		{new_filename(); yylloc.first_line=1;}
-{newline}		{yylloc.first_line++;}
+{preproc}		{/*new_filename();*/ line=1;}
+{newline}		{line++;}
+{cmtlin}		{line++;}
 {ws}			{/*empty*/}
-.				{fprintf(stderr, "%s:%d:Error:Unrecognised token %s\n", yylloc.filename, yylloc.first_line, yytext);}
+.				{fprintf(stderr, "%s:%d:Error:Unrecognised token %s\n", filename, line, yytext);}
 
 %%
 
 void new_filename() {
-	free(yylloc.filename);
-	yylloc.filename = strndup(yytext+5, strlen(yytext)-7);
+	free(filename);
+	filename = strndup(yytext+5, strlen(yytext)-7);
+	fprintf(stderr, "new filename is %s\n", filename);
 }
 
 void char_lit() {
@@ -235,8 +246,7 @@ int literal_val(char *buf, int is_str) {
 
 					if (num_char > 255) { // restrict overflow
 						fprintf(stderr, "%s:%d:Warning:Hex escape sequence \\x%x out of range\n",
-							yylloc.filename, yylloc.first_line, num_char);
-						fflush(stderr);
+							filename, line, num_char);
 						num_char = 255;
 					}
 					buf[buf_idx++] = (char) num_char;
@@ -250,8 +260,7 @@ int literal_val(char *buf, int is_str) {
 
 					if (num_char > 255) { // restrict overflow
 						fprintf(stderr, "%s:%d:Warning:Oct escape sequence \\o%o out of range\n",
-							yylloc.filename, yylloc.first_line, num_char);
-						fflush(stderr);
+							filename, line, num_char);
 						num_char = 255;
 					}
 					buf[buf_idx++] = (char) num_char;
@@ -266,8 +275,7 @@ int literal_val(char *buf, int is_str) {
 	if (char_done && yytext[i] != '\'') {
 		fprintf(stderr,
 			"%s:%d:Warning:Unsupported multibyte character literal truncated to first byte\n",
-			yylloc.filename, yylloc.first_line);
-		fflush(stderr);
+			filename, line);
 	}
 	return buf_idx;
 }
@@ -298,8 +306,7 @@ void number_val(char type) {
 		if (errno == ERANGE) {/* ERROR */
 			fprintf(stderr,
 				"%s:%d:Warning:Integer constant exceeds valid range\n",
-				yylloc.filename, yylloc.first_line);
-			fflush(stderr);
+				filename, line);
 		}
 	}	
 	else { /* floating */
@@ -313,8 +320,7 @@ void number_val(char type) {
 		if (errno == ERANGE) {/* ERROR */
 			fprintf(stderr,
 				"%s:%d:Warning:Floating constant exceeds valid range\n",
-				yylloc.filename, yylloc.first_line);
-			fflush(stderr);
+				filename, line);
 		}
 	}
 	yylval.n = tn;

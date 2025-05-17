@@ -1,8 +1,8 @@
-#include "ast_nodes.h"
+#include "expr.h"
 
 #include <stdlib.h>
 
-#include "parser.tab.h"
+#include "../parser.tab.h"
 
 #define new_ast_node calloc(1, sizeof(struct ast_node))
 

@@ -1,9 +1,9 @@
-#ifndef SYMTAB_OUTPUT_H
-#define SYMTAB_OUTPUT_H
+#ifndef SYMTAB_OUT_H
+#define SYMTAB_OUT_H
 
-#include "table.h"
-#include "symbol.h"
-#include "data.h"
+#include "../util/table.h"
+#include "../util/symbol.h"
+#include "../util/data.h"
 
 typedef struct ast_tab ast_tab_t;
 typedef struct ast_sym ast_sym_t;

@@ -1,8 +1,7 @@
 #include "symbol.h"
-#include "symtab.tab.h"
 
-ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
-    ast_data_t *data, char *filename, int start){
+ast_sym_t *new_ast_sym(char *name, char stg_type, short sym_type,
+        ast_data_t *data, char *filename, int start){
     ast_sym_t *sym;
 
     sym = calloc(1, sizeof(ast_sym_t));
@@ -19,8 +18,9 @@ ast_sym_t *new_ast_sym(char *name, char stg_type, char sym_type,
 ast_sym_t *copy_ast_sym(ast_sym_t *sym) {
     ast_sym_t *copy;
 
-    copy = new_ast_sym(strdup(sym->name), sym->stg_type, sym->sym_type,
-        copy_ast_data(sym->data, -1), strdup(sym->filename), sym->start);
+    copy = new_ast_sym((sym->name == NULL)? NULL : strdup(sym->name),
+        sym->stg_type, sym->sym_type, copy_ast_data(sym->data, -1),
+        strdup(sym->filename), sym->start);
     copy->end = sym->end;
     copy->sco_type = sym->sco_type;
     copy->is_inline = sym->is_inline;
@@ -30,6 +30,10 @@ ast_sym_t *copy_ast_sym(ast_sym_t *sym) {
 
 ast_sym_t *copy_sym_list(ast_sym_t *sym) {
     ast_sym_t *copy, *curr;
+
+    if (sym == NULL) {
+        return NULL;
+    }
 
     curr = copy_ast_sym(sym);
     copy = curr;
@@ -55,6 +59,9 @@ ast_sym_t *del_ast_sym(ast_sym_t *sym) {
 }
 
 ast_sym_t *list_start(ast_sym_t *sym) {
+    if (sym == NULL) {
+        return NULL;
+    }
     while (sym->prev != NULL) {
         sym = sym->prev;
     }
@@ -101,6 +108,7 @@ int get_align(ast_sym_t *memb, ast_sym_t *sym) {
                     align = __alignof__ (char);
                     break;
             }
+            break;
         case DATA_PTR:
             align = __alignof__ (void *);
             break;
@@ -129,60 +137,108 @@ int get_align(ast_sym_t *memb, ast_sym_t *sym) {
 
 ast_sym_t *resolve_tag(ast_tab_t *tab, ast_sym_t *sym) {
     ast_sym_t *tag;
+    ast_data_t *data;
 
     tag = get_sym(tab, sym->tail->node->sue->name, NS_TAG, sym->start, sym->end);
-    if (tag != NULL && tag->data->data_type == sym->data->node->sue->data_type) {
-        sym->tail->data_type = tag->data->data_type;
-        sym->tail->size = tag->data->size;
-
+    if (tag != NULL && tag->data->data_type == sym->tail->node->sue->data_type) {
         free(sym->tail->node->sue->name);
-        free(sym->tail->node->sue);
         free(sym->tail->node);
 
-        sym->tail->node = tag->data->node;
+        data = copy_ast_data(tag->data, -1);
+        sym->tail->data_type = tag->data->data_type;
+        sym->tail->size = tag->data->size;
+        sym->tail->node = data->node;
+        free(data);
         return tag;
     }
     return NULL;
 }
 
-int struct_fix_memb(ast_data_t *data, ast_sym_t *memb) {
-    int align, max_align;
+int struct_fix_memb(ast_sym_t *tag, ast_data_t *data, ast_sym_t *memb, ast_sym_t *next) {
+    int pos_mod, align, max_align;
+    ast_sym_t *temp;
+
     if (memb == NULL) {
         data->size = 0;
         return 0;
+    } 
+    
+    // remove s/u/e tags and enum consts from field list
+    else while (memb->sym_type & (SYM_STRU_T|SYM_UNIO_T|SYM_ENU_T|SYM_ENU_C)) {
+        temp = memb->prev;
+        
+        // move non-anon s/u/e tags and enum constants
+        // into list of symbols we install into the
+        // same scope as tag.
+        if (memb->sym_type & SYM_ENU_C || memb->name != NULL) {
+            memb->prev = tag->prev;
+            tag->prev = memb;
+        }
+
+        memb = temp;
+        if (next == NULL) {
+            data->node->stru->membs = memb;
+        } else {
+            next->prev = memb;
+        }
     }
 
+    // struct alignment and sizing, member offsetting
     memb->sym_type = SYM_STRU_M;
-    max_align = struct_fix_memb(data, memb->prev);
+    max_align = struct_fix_memb(tag, data, memb->prev, memb);
     align = get_align(memb, data->node->stru->tag);
     if (align > max_align) {
         max_align = align;
     }
 
-    memb->offset = data->size += (align - ((data->size-1) % align + 1));
+    pos_mod = (data->size-1) % align;
+    pos_mod += (pos_mod < 0)? align : 0;
+    memb->offset = data->size + (align - pos_mod - 1);
     data->size = memb->offset + memb->data->size;
     return max_align;
 }
 
-int struct_fix(ast_data_t *data) {
+int struct_fix(ast_sym_t *tag, ast_data_t *data) {
     int max_align;
 
-    max_align = struct_fix_memb(data, data->node->stru->membs);
+    max_align = struct_fix_memb(tag, data, data->node->stru->membs, NULL);
 
-    // pad struct so members in struct arrays remain aligned
     data->size += max_align - ((data->size-1) % max_align + 1);
     return 0;
 }
 
-int union_fix_memb(ast_data_t *data, ast_sym_t *memb) {
+int union_fix_memb(ast_sym_t *tag, ast_data_t *data, ast_sym_t *memb, ast_sym_t *next) {
     int align;
+    ast_sym_t *temp;
+
     if (memb == NULL) {
         data->size = 0;
         return 0;
     }
+    
+    // remove s/u/e tags and enum consts from field list
+    else while (memb->sym_type & (SYM_STRU_T|SYM_UNIO_T|SYM_ENU_T|SYM_ENU_C)) {
+        temp = memb->prev;
+        
+        // move non-anon s/u/e tags and enum constants
+        // into list of symbols we install into the
+        // same scope as tag.
+        if (memb->sym_type & SYM_ENU_C || memb->name != NULL) {
+            memb->prev = tag->prev;
+            tag->prev = memb;
+        }
 
+        memb = temp;
+        if (next == NULL) {
+            data->node->unio->membs = memb;
+        } else {
+            next->prev = memb;
+        }
+    }
+
+    // union alignment and sizing
     memb->sym_type = SYM_UNIO_M;
-    union_fix_memb(data, memb->prev);
+    union_fix_memb(tag, data, memb->prev, memb);
     align = get_align(memb, data->node->unio->tag);
     if (align > data->size) {
         data->size = align;
@@ -190,28 +246,36 @@ int union_fix_memb(ast_data_t *data, ast_sym_t *memb) {
     return 0;
 }
 
-int union_fix(ast_data_t *data) {
-    return union_fix_memb(data, data->node->unio->membs);
+int union_fix(ast_sym_t *tag, ast_data_t *data) {
+    int t = union_fix_memb(tag, data, data->node->unio->membs, NULL); 
+    return t;
 }
 
-ast_data_t *get_tail(ast_data_t *data) {
+ast_data_t *get_tail_head(ast_data_t *data, ast_data_t *tail) {
+    if (data == tail) {
+        return NULL;
+    }
     switch(data->data_type) {
         case DATA_PTR:
-            return (data->node->ptr->to == NULL)? data : get_tail(data->node->ptr->to);
+            return (data->node->ptr->to == tail)? data : get_tail_head(data->node->ptr->to, tail);
         case DATA_ARY:
-            return (data->node->ary->elem == NULL)? data : get_tail(data->node->ary->elem);
+            return (data->node->ary->elem == tail)? data : get_tail_head(data->node->ary->elem, tail);
         case DATA_FUNC:
-            return (data->node->func->ret == NULL)? data : get_tail(data->node->func->ret);
+            return (data->node->func->ret == tail)? data : get_tail_head(data->node->func->ret, tail);
         default:
             return data;
     }
 }
 
+ast_data_t *get_tail(ast_data_t *data) {
+    return get_tail_head(data, NULL);
+}
+
 ast_data_t *install_tail(ast_sym_t *sym, ast_data_t *tail) {
     if (sym->tail == NULL) {
         sym->data = tail;
-        sym->tail = tail;
-        return tail;
+        sym->tail = get_tail(tail);
+        return sym->tail;
     }
 
     switch (sym->tail->data_type) {
@@ -228,6 +292,6 @@ ast_data_t *install_tail(ast_sym_t *sym, ast_data_t *tail) {
             break;
     }
 
-    sym->tail = tail;
-    return tail;
+    sym->tail = get_tail(tail);
+    return sym->tail;
 }

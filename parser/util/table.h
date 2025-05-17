@@ -3,7 +3,8 @@
 
 #include "symbol.h"
 #include "data.h"
-#include "symtab_output.h"
+#include "../out/symtab_out.h"
+#include "../parser.tab.h"
 
 typedef struct ast_sym ast_sym_t;
 typedef struct ast_data ast_data_t;
@@ -28,7 +29,7 @@ typedef struct ast_tab {
 
 
 // Returns the namespace to which sym_type belongs.
-int get_namespace(int sym_type);
+int get_namespace(short sym_type);
 
 // Initialises a hash table. The default size for the
 // internal cell array is the smallest size provided
@@ -87,6 +88,7 @@ int sizeup(unsigned int size);
 // A simple hash function based on a symbol's name (key) and
 // its namespace.
 unsigned int hash(ast_tab_t *tab, char *key, char namespace);
+
 // Returns -1 if a symbol with the specified key and
 // namespace and whose scope is or surrounds that defined
 // by start and end does not exist, or the cell array index

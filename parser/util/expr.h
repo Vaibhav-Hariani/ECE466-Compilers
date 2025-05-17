@@ -1,5 +1,5 @@
-#ifndef AST_NODES_H
-#define AST_NODES_H
+#ifndef EXPR_H
+#define EXPR_H
 
 #include "yylval.h"
 
@@ -106,4 +106,4 @@ ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2, ast_node* e
 
 ast_node* new_ast_single(ast_node* expr, int op, int dir);
 
-#endif // AST_NODES_H
+#endif // EXPR_H

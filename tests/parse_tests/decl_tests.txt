@@ -1,0 +1,35 @@
+struct a;
+struct a {int b, c;};
+
+// enum hat {beanie, fedora, cap, pinwheel} s;
+
+int x, y[120];
+static char ***z;
+int *(**hello)[];
+int *(**hello)[25];
+
+volatile struct a sclomp;
+
+struct {int b; char c;} jonklette;
+extern union {int b; char c;} jonkler;
+
+struct doesnt_exist;
+static const struct doesnt_exist jangler;
+signed char jongo;
+static const struct doesnt_exist *jangler;
+
+int myFunc(int a, char, char *string);
+int myFunc(int i, char c, char *s) {
+    int new_i;
+    char *const string;
+}
+
+struct nest {
+    int twig_count;
+    struct egg {
+        int chick;
+    } *egg_1, *egg_2, egg_3;
+    char state, age;
+} nest_1;
+
+int movingon;

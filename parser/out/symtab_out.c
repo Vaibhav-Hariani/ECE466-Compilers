@@ -1,10 +1,10 @@
-#include "symtab_output.h"
+#include "symtab_out.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "symtab.tab.h"
+#include "../parser.tab.h"
 
 void print_indent(int num_tabs) {
     char tab_arr[num_tabs + 1];
@@ -142,7 +142,7 @@ int print_data(ast_data_t *data, int num_tabs) {
             break;
         case DATA_PTR:
             printf("pointer to\n");
-            print_data(data->node->ptr->to, num_tabs + 1);
+            print_data(data->node->ptr->to, num_tabs);
             break;
         case DATA_ARY:
             if (data->node->ary->size > 0) {
@@ -150,7 +150,7 @@ int print_data(ast_data_t *data, int num_tabs) {
             } else {
                 printf("ary of elements of type\n");
             }
-            print_data(data->node->ary->elem, num_tabs + 1);
+            print_data(data->node->ary->elem, num_tabs);
             break;
         case DATA_FUNC:
             if (!data->node->func->is_complete) {
@@ -159,12 +159,12 @@ int print_data(ast_data_t *data, int num_tabs) {
             printf("function with return type\n");
             print_data(data->node->func->ret, num_tabs + 1);
             print_indent(num_tabs);
-            printf("which takes the arguments:");
+            printf("which takes the arguments:\n");
             print_params(data->node->func->params, num_tabs + 1);
             break;
         case DATA_PARAM:
             printf("parameter of type\n");
-            print_data(data->node->param->is, num_tabs = 1);
+            print_data(data->node->param->is, num_tabs + 1);
             break;
         case DATA_STRU:
             if (data->node->stru->tag->name != NULL) {
@@ -207,6 +207,8 @@ int print_data(ast_data_t *data, int num_tabs) {
         case DATA_LABEL:
             printf("label");
             break;
+        default:
+            printf("you lose!!\n");
     }
     return 0;
 }
@@ -227,25 +229,61 @@ int print_memb_decl(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_na
     print_indent(num_tabs + 1);
     printf("data type:\n");
     print_data(memb->data, num_tabs + 2);
+    print_indent(num_tabs + 1);
+    if (sym->sym_type == SYM_STRU_T) {
+        printf("offset:\n");
+        print_indent(num_tabs + 2);
+        printf("%d\n", memb->offset);
+        print_indent(num_tabs);
+    }
+    printf("}\n");
+    return 0;
+}
+
+int print_enum_const(ast_sym_t *memb, ast_sym_t *sym, int num_tabs, char *data_name) {
+    if (memb == NULL) {
+        return 0;
+    }
+
+    print_memb_decl(memb->prev, sym, num_tabs, data_name);
+
     print_indent(num_tabs);
+    printf("%s %s constant %s defined at <%s>:%d {\n",
+        data_name, sym->name, memb->name, memb->filename, memb->start);
+    print_indent(num_tabs + 1);
+    printf("scope: ");
+    print_scope(memb->sco_type, memb->filename, memb->start);
+    print_indent(num_tabs + 1);
     printf("}\n");
     return 0;
 }
 
 int print_sym_decl(ast_sym_t *sym, int num_tabs) {
     print_indent(num_tabs);
-    printf("%s %s defined at <%s>:%d {\n",
-        (sym->sym_type == SYM_VAR)? "variable" : "function",
+    if (sym->sym_type == SYM_VAR) {
+        printf("variable ");
+    } else if (sym->sym_type == SYM_PARAM) {
+        printf("parameter ");
+    } else {
+        printf("function ");
+    }
+    printf("%s declared at <%s>:%d {\n",
         sym->name, sym->filename, sym->start);
     print_indent(num_tabs + 1);
-    printf("scope:     \t");
+    printf("scope:\n");
+    print_indent(num_tabs + 2);
     print_scope(sym->sco_type, sym->filename, sym->start);
     print_indent(num_tabs + 1);
-    printf("stg class: \t");
+    printf("stg class:\n");
+    print_indent(num_tabs + 2);
     print_stg(sym->stg_type);
     print_indent(num_tabs + 1);
     printf("data type:\n");
     print_data(sym->data, num_tabs+2);
+    print_indent(num_tabs + 1);
+    printf("size:\n");
+    print_indent(num_tabs + 2);
+    printf("%d\n", sym->data->size);
     print_indent(num_tabs);
     printf("}\n\n");
     return 0;
@@ -266,6 +304,9 @@ int print_obj_def(ast_sym_t *sym, int num_tabs) {
             data_name = strdup("union");
             membs = sym->data->node->unio->membs;
             break;
+        case SYM_ENU_T:
+            data_name = strdup("enum");
+            membs = NULL;
     }
     
     print_indent(num_tabs);
@@ -275,7 +316,10 @@ int print_obj_def(ast_sym_t *sym, int num_tabs) {
     printf("scope: ");
     print_scope(sym->sco_type, sym->filename, sym->start);
     
-    print_memb_decl(membs, sym, num_tabs + 1, data_name);
+    if (sym->sym_type != SYM_ENU_T) {
+        // structs, unions
+        print_memb_decl(membs, sym, num_tabs + 1, data_name);
+    }
 
     free(data_name);
     print_indent(num_tabs);
