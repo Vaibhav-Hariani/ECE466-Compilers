@@ -975,7 +975,7 @@ binop_expr:
 |	binop_expr SHR binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, SHR);}
 |	binop_expr EQEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, EQEQ);}
 |	binop_expr NOTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, NOTEQ);}
-|	binop_expr LOGAND binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, LOGAND);}
+|	binop_expr LOGAND binop_expr{ $$=new_ast_double(AST_binop, $1, $3, LOGAND);}
 |	binop_expr LOGOR binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, LOGOR);}
 |	binop_expr LTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, LTEQ);}
 |	binop_expr GTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, GTEQ);}

@@ -37,8 +37,9 @@ enum QUAD_CODES{
     //STORE writes src2 into src1, (which should also be dest)
     Q_STORE,    
 
-    //Pointer dereferencing
+    //Pointer dereferencing & UNOPS
     Q_LOAD,
+    Q_MOV,
 
     //Function relatives
     Q_ARGBEGIN,
@@ -87,9 +88,16 @@ struct quad {
     struct gen_node_t *destination,*src1,*src2;
 } typedef quad;
 
-//Singly linked list of quads
+//Singly linked list of quads or blocks
+//If it's a block, the index get's used at print time
+union ll_pointer {
+    quad* ll_quad;
+    big_block* ll_block;
+};
+
 struct quad_ll{
-    quad* cur;
+    union ll_pointer cur;
+    int is_block;
     struct quad_ll* next;
 };
 
@@ -97,18 +105,18 @@ struct big_block {
     //Array of pointers
     struct quad_ll* quad_head;
     struct quad_ll* quad_tail;
-
     int num_el;
     int block_ind;
+    char* block_label;
 } typedef big_block;
 
 
 //API
 //When control flow logic is detected, generate quads for each of those trees, and then append them to a new big_block
 //
-struct big_block* generate_blocks(struct ast_sym func_base); 
+// struct big_block* generate_block(struct ast_sym func_base); 
 
 
-// This operates on a single AST. No control logic
+// This operates on a single AST, of undetermined type
 // Count temps so they can tick up, clear when a single AST Node is complete 
 struct quad* generate_quads(struct ast_node node);
