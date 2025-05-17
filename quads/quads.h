@@ -7,11 +7,50 @@
 // }
 enum node_type{
     VAR,
-    TMP
+    TMP,
+    CONST
 };
 
 enum QUAD_CODES{
-    STORE
+//Simplest operations
+    Q_ADD=0,
+    Q_SUB=1,
+    Q_MUL,
+    Q_DIV,
+    Q_MOD,
+//Bitwise operations
+    Q_SHL,
+    Q_SHR,
+    Q_BAND,
+    Q_BOR,
+    Q_XOR,
+
+    Q_LOGNOT,
+    Q_LOGOR,
+    Q_LOGAND,
+
+
+    Q_EQUALS,
+
+    Q_GREATER,
+    Q_LESS,
+    //STORE writes src2 into src1, (which should also be dest)
+    Q_STORE,    
+
+    //Pointer dereferencing
+    Q_LOAD,
+
+    //Function relatives
+    Q_ARGBEGIN,
+    Q_ARG,
+    Q_CALL,
+
+    //Branches
+    Q_BREQ,
+    Q_BRNE,
+
+    //Just enough for now: Super basic 
+    
 };
 
 enum scope{
@@ -20,6 +59,8 @@ enum scope{
     GLOBAL,
 };
 
+//This should be replaced with something from
+//The AST
 struct ident {
     char* label;
     enum scope scope;
@@ -37,6 +78,8 @@ struct gen_node_t{
 union generic_node{
     struct ident* v; 
     struct tmp* t;
+    //Assuming this is just an integer
+    int c;
 };
 
 struct quad {
@@ -44,8 +87,17 @@ struct quad {
     struct gen_node_t *destination,*src1,*src2;
 } typedef quad;
 
+//Singly linked list of quads
+struct quad_ll{
+    quad* cur;
+    struct quad_ll* next;
+};
+
 struct big_block {
-    quad* quads;
+    //Array of pointers
+    struct quad_ll* quad_head;
+    struct quad_ll* quad_tail;
+
     int num_el;
     int block_ind;
 } typedef big_block;

@@ -1,201 +1,168 @@
 #include "quads.h"
 
-#define new_quad calloc(1,sizeof(quad))
-#define new_block calloc(1,sizeof( big_block))
+#define new_quad calloc(1, sizeof(quad))
 
-
-big_block* generate_blocks(struct ast_sym func_base) {}
-
-// This only handles expressions, converts them to
-quad* generate_quads(struct ast_node node) {
-  // Descend the ast in a depth first search manner
-  // assuming node has left
-  int tmp = 0;
-  descend_ast(node, 0);
+big_block* new_block() {
+  big_block* new_block = calloc(1, sizeof(big_block));
+  new_block->quad_head = calloc(1, sizeof(struct quad_ll));
 }
-
-struct gen_node_t* new_t(int tmp_ctr){
-    struct gen_node_t* node = calloc(1, sizeof(struct gen_node_t));
-    node->type = TMP;
-    struct tmp* data = calloc(1, sizeof(struct tmp)); 
-    data->value = tmp_ctr;
-    node->data.t = data;
-    return node;
-}
-struct gen_node_t* new_v(struct ident* d){
+// Creates a tmp node, and increments tmp_ctr
+struct gen_node_t* new_tmp(int tmp_ctr) {
   struct gen_node_t* node = calloc(1, sizeof(struct gen_node_t));
-  node->type= VAR;
+  node->type = TMP;
+  struct tmp* data = calloc(1, sizeof(struct tmp));
+  data->value = tmp_ctr;
+  node->data.t = data;
+  return node;
+}
+
+struct gen_node_t* new_var(struct ident* d) {
+  struct gen_node_t* node = calloc(1, sizeof(struct gen_node_t));
+  node->type = VAR;
   node->data.t = d;
   return node;
 }
 
-quad* quad_gen(struct gen_node_t* dest, struct gen_node_t* src1,struct gen_node_t* src2, int quad_code){
+struct gen_node_t* new_const(int val) {
+  struct gen_node_t* node = calloc(1, sizeof(struct gen_node_t));
+  node->type = CONST;
+  node->data.c = val;
+  return node;
+}
+
+quad* quad_gen(struct gen_node_t* dest, struct gen_node_t* src1,
+               struct gen_node_t* src2, int quad_code) {
   quad* quad = new_quad;
   quad->destination = dest;
-  quad ->op = quad_code;
-  quad -> src1 = src1;
-  quad -> src2 = src2;
+  quad->op = quad_code;
+  quad->src1 = src1;
+  quad->src2 = src2;
   return quad;
 }
 
-void append_quad(quad* q1, big_block* block){
-  block->num_el++;
-  quad* new_head = realloc(block->quads, sizeof(quad) *block->num_el);
-  block->quads = new_head;
+// Appends the quads from new to the end of ref.
+struct gen_node_t* append(big_block* ref, big_block* new) {
+  ref->quad_tail->next = new->quad_head;
+  ref->quad_tail = new->quad_tail;
+  ref->num_el += new->num_el;
+  // We can safely get rid of new
+  // This might be the only memory control in this compiler
+  free(new);
+  return ref->quad_tail->cur;
 }
 
-//Assuming a simple assignment
-// Proof of concept
+// Structured like this for more of an API interface
+// Underlying data structue changed a lot during development
+void append_quad(big_block* ref, quad* new) {
+  struct quad_ll* ll_wrapper = calloc(1, sizeof(struct quad_ll));
+  ll_wrapper->cur = new;
+  ref->quad_tail->next = ll_wrapper;
+  ref->quad_tail = ll_wrapper;
+}
 
-big_block* assignment_block(struct assign d, int* tmp_ctr){
-    big_block* list_of_blocks[3];
-    quad* final_quad;
+struct gen_node_t* get_element(ast_node* node, big_block* ref, int* tmp_ctr) {
+  // If this is not a constant or an expression
+  if (node == NULL) {
+    return NULL;
+  }
+  if (node->type == AST_ident) {
+    return new_var(node->obj.ident);
+  }
+  if (node->type == AST_num) {
+    return new_const(node->obj.num.val.i);
+  }
 
-    big_block* rblock = descend_ast(d.rvalue, tmp_ctr);
-    list_of_blocks[0] = rblock;
-    int num_blocks = 1;
+  big_block* b1 = descend_ast(node, tmp_ctr);
+  return append(ref, b1);
+}
 
-    if(d.lvalue->type == IDENT){      
-      // final_quad->destination = d.lvalue->obj.ident;
-      final_quad = (rblock->quads) + rblock->num_el - 1;
-      if(final_quad->destination->type==TMP){
-        final_quad->destination = d.lvalue->obj.ident;
+int parser_quad_op_conv(int parser_code){
+
+
+  return parser_code - Q_ADD;
+};
+
+// For single op instructions, a destination may be passed in which should be
+// ignored
+struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
+  big_block* ret = new_block;
+  struct gen_node_t* n1;
+  struct gen_node_t* n2;
+  int op;
+  quad* final_quad;
+
+  switch (node->type) {
+    case (AST_assign):
+      struct assign* assign_el = node->obj.a;
+      n1 = get_element(assign_el->lvalue, ret, tmp_ctr);
+      n2 = get_element(assign_el->rvalue, ret, tmp_ctr);
+      if (assign_el->opcode != '=' || assign_el->lvalue->type != IDENT) {
+        if (assign_el->opcode == '=') {
+          op = Q_STORE;
+          final_quad = quad_gen(n1, NULL, n2, op);
+          append_quad(ret, final_quad);
+
+        } else {
+          // QUAD_CODES has been aligned to make this operation
+          // possible
+          op = assign_el->opcode - PLUSEQ;
+          final_quad = quad_gen(n1, n1, n2, op);
+          append_quad(ret, final_quad);
+        }
+        // Is an IDENT with an opcode '='
       } else {
-        //Something really weird has happened here
-        perror("Error in assignment block creation.\n");
+        final_quad = ret->quad_tail->cur;
+        // Replace the final pointer
+        final_quad->destination = assign_el->lvalue->obj.l;
       }
-      //Somewhere here, some compound assignment stuff could happen
-      return rblock;
-    //Some form of weird dereferncing is happening, we need to simplify
-    } else {
-      big_block* lval = descend_ast(d.lvalue, tmp_ctr);
-      num_blocks = 2;
-      list_of_blocks[0] = lval;
-      final_quad = new_quad;
-      final_quad->destination = (lval->quads + lval->num_el - 1)->destination;
-      final_quad->op = STORE;      
-      big_block* final_block = combine_big_blocks(list_of_blocks,2);
-      append_quad(final_block, final_quad);
-      return final_block;
-    }
-}
+      break;
 
-big_block* binop_block(struct binop b, int* tmp_ctr){
-  big_block* list_of_blocks[2];
-  int num_blocks = 0;
-  big_block* block1;
+    case (AST_binop):
+      struct binop* binop_el = node->obj.b;
+      n1 = get_element(binop_el->expr_1, ret, tmp_ctr);
+      n2 = get_element(binop_el->expr_2, ret, tmp_ctr);
+      struct gen_node_t* tmp = new_tmp(tmp_ctr);
+      (*tmp_ctr)++;
 
-  if(b.expr_1 != IDENT){
-    block1 = descend_ast(b.expr_1,tmp_ctr);
-    list_of_blocks[num_blocks] = block1;
-    num_blocks++;
+      op = ast_quad_op(binop_el->opcode);
+      final_quad = quad_gen(tmp, n1, n2, op);
 
-  } else {
-    block1 = new_block;
-    descend_ast(b.expr_1,tmp_ctr);
-    list_of_blocks[num_blocks] = block;
-    num_blocks++;
+      append_quad(ret, final_quad);
+      break;
 
+    case (AST_funct):
+      struct funct* funct_el = node->obj.f;
+
+      struct list_node* args = funct_el->args;
+      // Might need to make this a pointer or something
+      int* counter = 0;
+      struct gen_node_t* start = new_const(counter);
+      quad* argBegin = quad_gen(NULL, start, NULL, Q_ARGBEGIN);
+      append_quad(ret, argBegin);
+      while (args->cur != NULL) {
+        counter++;
+        struct gen_node_t* count_wrap = new_const(counter);
+        struct gen_node_t* current_arg =
+            get_element(funct_el->args->cur, ret, tmp_ctr);
+        quad* arg_quad = quad_gen(NULL, current_arg, count_wrap, Q_ARG);
+        append(ret, arg_quad);
+      }
+      argBegin->src1->data.c = counter;
+      n1 = new_tmp(tmp_ctr);
+      n2 = new_var(funct_el->name);
+      (*tmp_ctr)++;
+      quad* func_call_quad = quad_gen(n1, n2, NULL, Q_CALL);
+      break;
+
+    case (AST_unop):
+      switch (op) {
+        n1 = get_element(node->obj.u, ret, tmp_ctr);
+        case '*':
+          op = Q_LOAD;
+          quad* arg_quad = quad_gen(NULL, n1, NULL, Q_LOAD);
+          break;
+      }
   }
-  if(b.expr_2 != IDENT){
-    big_block* block = descend_ast(b.expr_1,tmp_ctr);
-    list_of_blocks[num_blocks] = block;
-    num_blocks++;
 
-  }
-
-  big_block* rblock = descend_ast(d.rvalue, tmp_ctr);
-  list_of_blocks[0] = rblock;
-  int num_blocks = 1;
-
-  quad* final_quad = new_quad;
-  final_quad->destination = new_t(tmp_ctr);
-  tmp_ctr++;
-}
-
-
-
- big_block* binop(struct assign d, int* tmp_ctr){}
-
- big_block* descend_ast(ast_node* node, int* tmp_ctr){
-  switch (node->type){
-    case 'x':
-    break;
-  }  
-
-    struct big_block* final = calloc(1, sizeof(struct big_block));
- }
-
-// Descends the AST given a specific node
- big_block* descend_ast(ast_node node, int tmp_counter) {
-  int num_elements = 0;
-  struct big_block dest = {0};
-  struct big_block src1, src2 = {0};
-  struct ast_sym ast_children[3] = {0};
-  int opcode = 0;
-  switch (node.data->type) {
-    // TODO: Change this to something rational
-
-    // Ternops should have their own routine for parsing
-    //  as they should break up until multiple quads
-    case AST_ternop:
-      num_elements = 3;
-      ast_children[0] = node.ternop.expr_1;
-      ast_children[1] = node.ternop.expr_2;
-      ast_children[2] = node.ternop.expr_2;
-      break;
-    case AST_binop:
-      num_elements = 2;
-      ast_children[0] = node.binop.expr_1;
-      ast_children[1] = node.binop.expr_2;
-      opcode = node.opcode;
-      break;
-    case AST_unop:
-      num_elements = 1;
-      ast_children[0] = node.binop.expr_1;
-      ast_children[1] = node.binop.expr_2;
-      opcode = node.opcode;
-      break;
-    case AST_assign:
-      num_elements = 2;
-      ast_children[0] = node.binop.expr_1;
-      ast_children[1] = node.binop.expr_1;
-      break;
-      /*
-        ... for all ast types:
-        Some behavior that should be handled
-        All functs should have a big block label already, on our pass through the
-        scopes before this quad exec happens we should store params call function
-        save return type to a tmp
-        This and ternop is the only "routine" that exists within an expression      
-      */
-    case AST_funct:
-      break;
-    // This element should never be an ident, this is an error state
-    case AST_ident:
-      break;
-  }
-}
-
-
-
- big_block* combine_big_blocks( big_block** blocks,
-                                     int num_blocks) {
-  int new_num = 0;
-  for (int i = 0; i < num_blocks; i++) {
-    new_num += blocks[i]->num_el;
-  }
-   quad* new_head = realloc(blocks[0]->quads, sizeof(quad) * new_num);
-  blocks[0]->quads = new_head;
-   quad* head = new_head + blocks[0]->num_el;
-  for (int i = 1; i < num_blocks; i++) {
-    int num_move = blocks[i]->num_el;
-    quad* loc = blocks[i]->quads;
-    // Copy all bytes from this array to new head
-    memmove(head, loc, sizeof(quad) * num_move);
-    head = head + num_move;
-    free(blocks[i]);
-  }
-  (*blocks)->num_el = new_num;
-  return blocks;
+  return ret;
 }
