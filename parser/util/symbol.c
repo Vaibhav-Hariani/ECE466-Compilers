@@ -209,7 +209,7 @@ int struct_fix(ast_sym_t *tag, ast_data_t *data) {
 
 int union_fix_memb(ast_sym_t *tag, ast_data_t *data, ast_sym_t *memb, ast_sym_t *next) {
     int align;
-    struct ast_sym_t *temp;
+    ast_sym_t *temp;
 
     if (memb == NULL) {
         data->size = 0;
