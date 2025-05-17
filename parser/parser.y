@@ -221,13 +221,18 @@ function_def: /*does not support k&r style*/
 statement:
 	compound_statement {
 		insert_list(tab, $1, SCO_BLOCK, @1.last_line, 1);
-		$$ = NULL;
-	}
-|	labeled_statement {$$= NULL;}
-|	expr_statement {$$= NULL;}
-|	select_statement {$$= NULL;}
-|	iter_statement {$$= NULL;}
-|	jmp_statement {$$= NULL;}
+		$$ = $1;}
+|	labeled_statement {
+		insert_list(tab, $1, SCO_BLOCK, @1.last_line, 1);
+		$$ = $1;}
+		
+|	expr_statement {$$= $1;}
+|	select_statement {$$= insert_list(tab, $1, SCO_BLOCK, @1.last_line, 1);
+		$$ = $1;}
+|	iter_statement{$$= insert_list(tab, $1, SCO_BLOCK, @1.last_line, 1);
+		$$ = $1;}
+|	jmp_statement {$$= insert_list(tab, $1, SCO_BLOCK, @1.last_line, 1);
+		$$ = $1;}
 ;
 
 
