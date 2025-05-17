@@ -100,7 +100,15 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <data> pointer;
 %nterm <data> type_name;
 %nterm <sym> prog declaration_or_fndef function_def;
-%nterm <sym> compound_statement decl_or_stmt decl_or_stmt_list statement
+
+
+//Defining and expanding the definition of statements
+%nterm <sym> decl_or_stmt decl_or_stmt_list 
+
+%nterm <sym> statement compound_statement labeled_statement
+%nterm <sym> expr_statement select_statement iter_statement jmp_statement
+
+
 %nterm <sym> declaration declaration_spec untyped_declaration_spec param_declaration;
 %nterm <sym> init_declarator init_declarator_list;
 %nterm <sym> type_spec;
@@ -113,7 +121,8 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <sym> param_declarator abstract_declarator direct_abstract_declarator;
 %nterm <sym> field_list param_list;
 
-%nterm <node> term_expr expr binop_expr ternop_expr unop_expr assign_expr arg_list
+%nterm <node> opt_expr term_expr expr binop_expr ternop_expr unop_expr assign_expr 
+/* %nterm <node> arg_list */
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
@@ -206,10 +215,28 @@ function_def: /*does not support k&r style*/
 	}
 ;
 
+//I'm assuming most of these take the form of the compound statement
+statement:
+	compound_statement {
+		insert_list(tab, $1, SCO_BLOCK, @1.last_line, 1);
+		$$ = NULL;
+	}
+|	labeled_statement {$$= NULL;}
+|	expr_statement {$$= NULL;}
+|	select-statement {$$= NULL;}
+|	iter-statement {$$= NULL;}
+|	jmp-statement {$$= NULL;}
+;
+
+
+//Statement declarations
+opt_expr: %empty {$$=NULL;}
+|   term_expr {$$=$1;}
+;
+
 compound_statement:
 	'{' decl_or_stmt_list '}'	{
 		ast_sym_t *temp;
-
 		temp = $2;
 		while (temp != NULL) {
 			if (temp->stg_type == STG_NONE) {
@@ -217,10 +244,37 @@ compound_statement:
 			}
 			temp = temp->prev;
 		}
-
 		$$ = $2;
 	}
 ;
+
+labeled_statement: IDENT ':' statement {$$=NULL;}
+//Ternop expressions is equivalent to condtional expressions/constant expresisons
+|   CASE ternop_expr ':' statement {$$=NULL;}
+|   DEFAULT ':' statement {$$=NULL;}
+;
+
+
+select-statement: IF '(' expr ')' statement {$$=NULL;}
+|   select-statement ELSE statement {$$=NULL;}
+|   SWITCH '(' expr ')' statement {$$=NULL;}
+;
+
+expr_statement:	opt_expr ';' {$$=NULL;}
+
+
+iter-statement: WHILE '(' expr ')' statement {$$=NULL;}
+|   DO statement WHILE '(' expr ')' ';' {$$=NULL;}
+|   FOR '(' opt_expr ';' opt_expr ';'  opt_expr ';' ')' statement {$$=NULL;}
+//Not including declarative iterations
+;
+
+jmp-statement: GOTO IDENT ';' {$$=NULL;}
+|   CONTINUE ';' {$$=NULL;}
+|   BREAK ';'  {$$=NULL;}
+|   RETURN opt_expr ';' {$$=NULL;}
+;
+
 
 decl_or_stmt_list:
 	%empty	{$$ = NULL;}
@@ -239,13 +293,6 @@ decl_or_stmt:
 |	statement {$$ = NULL;}
 ;
 
-statement:
-	compound_statement {
-		insert_list(tab, $1, SCO_BLOCK, @1.last_line, 1);
-		$$ = NULL;
-	}
-|	term_expr ';' {}
-;
 
 declaration:
 	struct_type_def ';' {$$ = $1;}
@@ -898,7 +945,9 @@ unop_expr:
 |	unop_expr '.' IDENT	{ $$ = new_ast_double(AST_binop, $1, new_ast_ident($3), '.');}
 //Helper function that should expand this into what it actually is
 |	unop_expr '['term_expr']'	{ $$= ast_array_exp($1,$3);}
-|	unop_expr '(' arg_list ')'	{ $$=new_ast_double(AST_funct, $1, $3, ')');}
+
+//Original function definition, no longer needed?
+/* |	unop_expr '(' arg_list ')'	{ $$=new_ast_double(AST_funct, $1, $3, ')');} */
 |	'+' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '+', PREFIX);}
 |	'-' unop_expr %prec SIZEOF	{ $$= new_ast_single($2, '-', PREFIX);}
 |	'!' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '!', PREFIX);}
@@ -907,7 +956,6 @@ unop_expr:
 |	 '*' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '*', PREFIX);}
 |	SIZEOF unop_expr	{$$ = new_ast_single($2, SIZEOF, PREFIX);}
 ;
-
 
 binop_expr:
 	unop_expr	{$$=$1;}
