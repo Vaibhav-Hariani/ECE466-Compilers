@@ -31,8 +31,10 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %left SHL SHR
 %left '+' '-'
 %left '*' '/' '%'
-%right SIZEOF PREFIX '!' '~' 
+%right SIZEOF PREFIX '!' '~'
 %left '(' ')' '[' ']'  POSTFIX PLUSPLUS MINUSMINUS INDSEL '.'
+//Necessary to resolve shift-reduce
+%nonassoc ELSE
 
 %union {
 	char *i;
@@ -223,9 +225,9 @@ statement:
 	}
 |	labeled_statement {$$= NULL;}
 |	expr_statement {$$= NULL;}
-|	select-statement {$$= NULL;}
-|	iter-statement {$$= NULL;}
-|	jmp-statement {$$= NULL;}
+|	select_statement {$$= NULL;}
+|	iter_statement {$$= NULL;}
+|	jmp_statement {$$= NULL;}
 ;
 
 
@@ -255,21 +257,21 @@ labeled_statement: IDENT ':' statement {$$=NULL;}
 ;
 
 
-select-statement: IF '(' expr ')' statement {$$=NULL;}
-|   select-statement ELSE statement {$$=NULL;}
+select_statement: IF '(' expr ')' statement {$$=NULL;}
+|   IF '(' expr ')' statement ELSE statement {$$=NULL;}
 |   SWITCH '(' expr ')' statement {$$=NULL;}
 ;
 
-expr_statement:	opt_expr ';' {$$=NULL;}
+expr_statement:	opt_expr ';' {$$=$1;}
 
 
-iter-statement: WHILE '(' expr ')' statement {$$=NULL;}
-|   DO statement WHILE '(' expr ')' ';' {$$=NULL;}
+iter_statement: WHILE '(' expr_statement ')' statement {$$=NULL;}
+|   DO statement WHILE '(' expr_statement ')' ';' {$$=NULL;}
 |   FOR '(' opt_expr ';' opt_expr ';'  opt_expr ';' ')' statement {$$=NULL;}
 //Not including declarative iterations
 ;
 
-jmp-statement: GOTO IDENT ';' {$$=NULL;}
+jmp_statement: GOTO IDENT ';' {$$=NULL;}
 |   CONTINUE ';' {$$=NULL;}
 |   BREAK ';'  {$$=NULL;}
 |   RETURN opt_expr ';' {$$=NULL;}
