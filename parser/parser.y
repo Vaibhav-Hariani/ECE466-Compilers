@@ -15,9 +15,9 @@ EXTERN	FLOAT	FOR	GOTO	IF	INLINE	INT	LONG
 REGISTER	RESTRICT	RETURN	SHORT	SIGNED	STATIC	
 STRUCT	SWITCH	TYPEDEF	UNION	UNSIGNED	VOID	
 VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
-%token 
+/* %token 
     PLUSPLUS "++" 
-    MINUSMINUS "--"
+    MINUSMINUS "--" */
 %left ','
 %right '=' PLUSEQ MINUSEQ DIVEQ TIMESEQ MODEQ SHLEQ SHREQ ANDEQ OREQ XOREQ
 %right '?' ':'	/* This is where yacc will put it */
@@ -41,7 +41,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 	char c;
 	TypedNumber n;
     SizedString s;
-    ast_node *node;
+    struct ast_node *node;
     ast_data_t *data;
     ast_sym_t *sym;
     ast_tab_t *tab;
@@ -68,6 +68,8 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
     #include "util/data.h"
     #include "out/expr_out.h"
     #include "out/symtab_out.h"
+	#include "../quads/util/quads.h"
+	#include "../quads/out/quads_out.h"
     void yyerror(const char *format, ...);
 
 	typedef struct ast_tab ast_tab_t;
@@ -139,7 +141,8 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 
 prog:
 	%empty	{$$ = NULL;}
-|	prog declaration_or_fndef	{$$ = NULL;}
+|	prog assign_expr ';'	{int a = 0; int b = 0; big_block* bb = descend_ast($2,&a, &b); print_quad_block(bb);
+	$$ = NULL;}
 ;
 
 declaration_or_fndef:
@@ -939,17 +942,17 @@ expr:
 
 unop_expr:
 	expr {$$=$1;}
-|	unop_expr "++" %prec POSTFIX	{ $$ = new_ast_single($1, PLUSPLUS, POSTFIX);}
-|	unop_expr "--" %prec POSTFIX	{ $$ = new_ast_single($1, MINUSMINUS, POSTFIX);}
-|	"++" unop_expr %prec PREFIX	{ $$ = new_ast_single($2, PLUSPLUS, PREFIX);}
-|	"--" unop_expr %prec PREFIX	{ $$ = new_ast_single($2, MINUSMINUS, PREFIX);}
+|	unop_expr PLUSPLUS %prec POSTFIX	{ $$ = new_ast_single($1, PLUSPLUS, POSTFIX);}
+|	unop_expr MINUSMINUS %prec POSTFIX	{ $$ = new_ast_single($1, MINUSMINUS, POSTFIX);}
+|	PLUSPLUS unop_expr %prec PREFIX	{ $$ = new_ast_single($2, PLUSPLUS, PREFIX);}
+|	MINUSMINUS unop_expr %prec PREFIX	{ $$ = new_ast_single($2, MINUSMINUS, PREFIX);}
 |	unop_expr INDSEL IDENT	{ $$=new_ast_double(AST_binop, $1, new_ast_ident($3), INDSEL);}
 |	unop_expr '.' IDENT	{ $$ = new_ast_double(AST_binop, $1, new_ast_ident($3), '.');}
 //Helper function that should expand this into what it actually is
 |	unop_expr '['term_expr']'	{ $$= ast_array_exp($1,$3);}
 
 //Original function definition, no longer needed?
-/* |	unop_expr '(' arg_list ')'	{ $$=new_ast_double(AST_funct, $1, $3, ')');} */
+|	unop_expr '(' arg_list ')'	{ $$=new_ast_double(AST_funct, $1, $3, ')');}
 |	'+' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '+', PREFIX);}
 |	'-' unop_expr %prec SIZEOF	{ $$= new_ast_single($2, '-', PREFIX);}
 |	'!' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '!', PREFIX);}

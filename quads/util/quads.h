@@ -1,5 +1,6 @@
 #include <string.h>
 #include "expr.h"
+#include <stdio.h>
 
 // union generic_node{
 //     int 
@@ -72,7 +73,7 @@ union generic_node{
 };
 
 struct gen_node_t{
-    enum node_type type;
+    enum Q_TYPE type;
     union generic_node data;
 };
 
@@ -117,4 +118,3 @@ struct big_block {
 struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr);
 struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr);
 struct big_block* descend_stmt_ast(ast_node* node, int* tmp_ctr, int* block_ctr);
-void print_quad_block(big_block* block);

@@ -1,6 +1,6 @@
 #include "expr.h"
-#include "quads.h"
-
+#include "util/quads.h"
+#include "out/quads_out.h"
 int main(){
     //Simulating b =  a + 5
     //This is a super duper simplistic implementation: trying anyway?
