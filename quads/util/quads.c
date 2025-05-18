@@ -53,12 +53,12 @@ quad* quad_gen(struct gen_node_t* dest, struct gen_node_t* src1,
 // Appends the quads from new to the end of ref.
 // Returns the destination of the last value
 struct gen_node_t* append(big_block* ref, big_block* new) {
-  if(ref->num_el == 0){
+  if (ref->num_el == 0) {
     ref->quad_head = new->quad_head;
     ref->quad_tail = new->quad_tail;
   } else {
-      ref->quad_tail->next = new->quad_head;
-      ref->quad_tail = new->quad_tail;
+    ref->quad_tail->next = new->quad_head;
+    ref->quad_tail = new->quad_tail;
   }
   ref->num_el += new->num_el;
   // We can safely get rid of new
@@ -73,17 +73,17 @@ void internal_block(big_block* ref, big_block* new) {
   ll_wrapper->cur.ll_block = new;
   ref->quad_tail->next = ll_wrapper;
   ref->quad_tail = ll_wrapper;
-  ref->num_el ++;
+  ref->num_el++;
 }
 
 // Structured like this for more of an API interface
 // Underlying data structue changed a lot during development
 void append_quad(big_block* ref, quad* new) {
-  if(ref->num_el == 0){
+  if (ref->num_el == 0) {
     ref->quad_head->cur.ll_quad = new;
     ref->num_el++;
   } else {
-    struct quad_ll* ll_wrapper = calloc(1,sizeof(struct quad_ll));
+    struct quad_ll* ll_wrapper = calloc(1, sizeof(struct quad_ll));
     ll_wrapper->cur.ll_quad = new;
     ref->quad_tail->next = ll_wrapper;
     ref->quad_tail = ll_wrapper;
@@ -109,6 +109,31 @@ struct big_block* create_func(ast_node* funct_head, int* tmp_ctr,
   }
   return ret;
 }
+
+// Only support while loops
+// While loops are while and expr
+// On expr they should exit
+// breaks during a while loop should jmp to the surrounding block end.
+struct big_block* create_loop(ast_node* loop_head, int* tmp_ctr,
+                              char* func_label, int* block_ctr) {
+  // Stack holds the args in order based on arg_begin.
+  // This should just be another descent, but with a named big block?
+  big_block* ret = new_block();
+  ret->block_ind = *block_ctr;
+  cond =
+      // Treat like a compound statement::
+
+      // //Some way to descend the AST from the new head
+      // big_block* next_block = descend_ast(funct_head->obj.);
+      big_block * next_block;
+  if (next_block->block_ind > 0) {
+    internal_block(ret, next_block);
+  } else {
+    append(ret, next_block);
+  }
+  return ret;
+}
+
 
 // ast_sym_t* symtab_lookup(char* ident) {
 //   ast_sym_t* ret = calloc(0, sizeof(ast_sym_t));
@@ -154,7 +179,7 @@ struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr) {
   }
   // return descend_expr_ast(node, tmp_ctr);
   big_block* ret = descend_stmt_ast(node, tmp_ctr, block_ctr);
-  *(block_ctr)++;
+  (*block_ctr)++;
   return ret;
 }
 
@@ -169,6 +194,12 @@ struct big_block* descend_stmt_ast(ast_node* node, int* tmp_ctr,
   return ret;
 }
 
+struct gen_node_t* get_ptr_el(ast_node* node, big_block* ret, int* tmp_ctr) {
+  // Outer most node is a unop of type ptr
+  // Strip away and return final element
+  return get_element(node->obj.u->expr, ret, tmp_ctr);
+}
+
 // For single op instructions, a destination may be passed in which should be
 // ignored
 struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
@@ -181,17 +212,25 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
   switch (node->type) {
     case (AST_assign):
       struct assign* assign_el = node->obj.a;
-      n1 = get_element(assign_el->lvalue, ret, tmp_ctr);
       n2 = get_element(assign_el->rvalue, ret, tmp_ctr);
+
+      // Can replace with some typechecking
+      if (!(assign_el->lvalue->type == AST_ident ||
+            (assign_el->lvalue->type == AST_unop &&
+             assign_el->lvalue->obj.u->opcode == '*'))) {
+        printf("Invalid lvalue: Must be pointer or obj reference \n");
+        return ret;
+      }
 
       if (assign_el->opcode != '=' || assign_el->lvalue->type != AST_ident) {
         if (assign_el->opcode == '=') {
           // Left side must be a pointer in this case: It'll have a * or
           // something
+          // Need to intercept value before pointer
+          n1 = get_ptr_el(assign_el->lvalue, ret, tmp_ctr);
           op = Q_STORE;
           final_quad = quad_gen(n1, NULL, n2, op);
           append_quad(ret, final_quad);
-
         } else {
           // QUAD_CODES has been aligned to make this operation
           // possible
@@ -201,6 +240,7 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
         }
         // Is an IDENT with an opcode '='
       } else {
+        n1 = get_element(assign_el->lvalue, ret, tmp_ctr);
         final_quad = ret->quad_tail->cur.ll_quad;
         // Replace the final pointer with the final quad value
         // This should always evaluate to a quad
@@ -215,6 +255,7 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
       // TODO:
       // Handling pointer addition: this should be replaced with a function
       // table lookup
+
       if ((((binop_el->expr_1->type == DATA_PTR) -
             (binop_el->expr_2->type == DATA_PTR)) != 0) &&
           binop_el->opcode == '+') {
@@ -231,9 +272,12 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
         // quad inter_quad = quad_gen()
         // //get data from n2
         // n2->data.v
+        printf("Pointer on Pointer coming Soon!\n");
+
       } else if (binop_el->expr_1->type == DATA_PTR &&
                  binop_el->expr_2->type == DATA_PTR &&
                  binop_el->opcode == '-') {
+        printf("Pointer on Pointer coming Soon!\n");
         // Get size from binop 1
         int size_of_val;
         // size = binop_el->expr_1.
@@ -249,13 +293,24 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
         append_quad(ret, final_quad);
 
       } else {
-        struct gen_node_t* tmp = new_tmp(*tmp_ctr);
-        (*tmp_ctr)++;
-
         op = ast_quad_op(binop_el->opcode);
-        final_quad = quad_gen(tmp, n1, n2, op);
+        // Comparision op
 
-        append_quad(ret, final_quad);
+        if (op <= Q_LESS && op >= Q_EQUALS) {
+          op = L_EQ + op - Q_EQUALS;
+          quad* inter_quad = quad_gen(NULL, n1, n2, Q_CMP);
+          struct gen_node_t* tmp = new_tmp(*tmp_ctr);
+          (*tmp_ctr)++;
+          final_quad = quad_gen(tmp, )
+
+          append_quad(ret, inter_quad);
+
+        } else {
+          struct gen_node_t* tmp = new_tmp(*tmp_ctr);
+          (*tmp_ctr)++;
+          final_quad = quad_gen(tmp, n1, n2, op);
+          append_quad(ret, final_quad);
+        }
       }
       break;
 
@@ -287,7 +342,7 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
       // Unops don't evaluate to quads, they should evaluate to
 
     case (AST_unop):
-      struct unop* unop_el = node->obj.u; 
+      struct unop* unop_el = node->obj.u;
       n1 = get_element(unop_el->expr, ret, tmp_ctr);
       // Pointer Dereference
       // Need to be able to get sizeof n1, for all following quads in this
@@ -295,12 +350,12 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
       switch (unop_el->opcode) {
         case '*':
           n2 = new_tmp(*tmp_ctr);
-          *(tmp_ctr)++;
+          (*tmp_ctr)++;
           final_quad = quad_gen(n2, n1, NULL, Q_LOAD);
           break;
         case SIZEOF:
           n2 = new_tmp(*tmp_ctr);
-          *(tmp_ctr)++;
+          (*tmp_ctr)++;
           // Get size of the first node
           // limiting sizeof to only accept static objs
           //  struct gen_node_t* val = new_const(n1.size);
@@ -335,26 +390,25 @@ int ast_quad_op(int op) {
     case '%':
       return Q_MOD;
     // Bitwise operators
-    case '&':
-      return Q_BAND;  // bitwise AND
-    case '|':
-      return Q_BOR;  // bitwise OR
-    case '^':
-      return Q_XOR;  // bitwise XOR
+    // case '&':
+    //   return Q_BAND;  // bitwise AND
+    // case '|':
+    //   return Q_BOR;  // bitwise OR
+    // case '^':
+    //   return Q_XOR;  // bitwise XOR
     // Relational operators
     case '<':
       return Q_LESS;
     case '>':
       return Q_GREATER;
-    case LOGOR:
-      return Q_LOGOR;
-    case LOGAND:
-      return Q_LOGAND;
-    case SHL:
-      return Q_SHL;
-    case SHR:
-      return Q_SHR;
-
+    // case LOGOR:
+    //   return Q_LOGOR;
+    // case LOGAND:
+    //   return Q_LOGAND;
+    // case SHL:
+    //   return Q_SHL;
+    // case SHR:
+    //   return Q_SHR;
     default:
       // If the operator is not in the list above, it's not supported by this
       // function or doesn't have a mapping in the original QUAD_CODES.

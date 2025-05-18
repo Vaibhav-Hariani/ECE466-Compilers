@@ -11,6 +11,14 @@ enum Q_TYPE{
     Q_CONST
 };
 
+enum CC_CODES {
+    L_EQ = 50,
+    L_GR = 51,
+    L_GEQ = 52,
+    L_LEQ = 53,
+    L_LT = 54,
+};
+
 enum QUAD_CODES{
 //Simplest operations
     Q_ADD=0,
@@ -18,22 +26,38 @@ enum QUAD_CODES{
     Q_MUL,
     Q_DIV,
     Q_MOD,
-//Bitwise operations
-    Q_SHL,
-    Q_SHR,
-    Q_BAND,
-    Q_BOR,
-    Q_XOR,
 
-    Q_LOGNOT,
-    Q_LOGOR,
-    Q_LOGAND,
+//Binary & Shift operations
+    // Q_SHL,
+    // Q_SHR,
 
 
+    // Q_BAND,
+    // Q_BOR,
+    // Q_XOR,
+
+    // Q_LOGNOT,
+    // Q_LOGOR,
+    // Q_LOGAND,
+
+//Conditionals
+    Q_CMP,
+//"Hidden" Quads
+//They evaluate to larger, related quads at generation time    
     Q_EQUALS,
-
     Q_GREATER,
+    Q_GEQ,
+    Q_LEQ,
     Q_LESS,
+//Exposed versions
+    L_EQ = 50,
+    L_GR = 51,
+    L_GEQ = 52,
+    L_LEQ = 53,
+    L_LT = 54,
+
+
+
     //STORE writes src2 into src1, (which should also be dest)
     Q_STORE,    
 

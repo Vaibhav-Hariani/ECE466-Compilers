@@ -45,7 +45,7 @@ void gen_node_str(struct gen_node_t* node) {
       break;
     // If I have 4 digit TMP counts something has gone wrong
     case TMP:
-      printf("%% T%d ",node->data.t->value);
+      printf("%%T%d ",node->data.t->value);
       break;
     case Q_CONST:
       printf("%d ", node->data.c);
@@ -66,28 +66,18 @@ char* qcode_str_conv(int code) {
       return "DIV";
     case Q_MOD:
       return "MOD";
-    case Q_SHL:
-      return "SHL";
-    case Q_SHR:
-      return "SHR";
-    case Q_BAND:
-      return "BAND";
-    case Q_BOR:
-      return "BOR";
-    case Q_XOR:
-      return "XOR";
-    case Q_LOGNOT:
-      return "LOGNOT";
-    case Q_LOGOR:
-      return "LOGOR";
-    case Q_LOGAND:
-      return "LOGAND";
-    case Q_EQUALS:
-      return "EQUALS";
-    case Q_GREATER:
-      return "GREATER";
-    case Q_LESS:
-      return "LESS";
+    case L_EQ:
+      return "EQ";
+    case L_GR:
+      return "GR";
+    case L_GEQ:
+      return "GEQ";
+    case L_LEQ:
+      return "LEQ";
+    case L_LT:
+      return "LT";
+    case Q_CMP:
+      return "CMP";
     case Q_STORE:
       return "STORE";
     case Q_LOAD:
@@ -102,6 +92,7 @@ char* qcode_str_conv(int code) {
       return "BREQ";
     case Q_BRNE:
       return "BRNE";
+
   }
   return "UNKNOWN_Q_CODE";  // Should not happen if all codes are handled
 }
