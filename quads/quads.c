@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define new_quad calloc(1, sizeof(quad))
+#define new_quad calloc(1, sizeof(struct quad))
 
 char* qcode_str_conv(int code);
 char* gen_node_str(struct gen_node_t* node);
@@ -26,19 +26,19 @@ void print_quad_block(big_block* block) {
   }
   struct quad_ll* head = block->quad_head;
   while (head != NULL) {
+    printf("\n");
     if (head->is_block) {
       print_quad_block(head->cur.ll_block);
     } else {
       print_quad(head->cur.ll_quad);
     }
+    head = head->next;
   }
+  printf("\n");
 }
 
 char* gen_node_str(struct gen_node_t* node) {
-  if (node == NULL) {
-    return 0;
-  }
-  char* str = calloc(5, sizeof(char));
+  char* str = calloc(10, sizeof(char));
   switch (node->type) {
     case VAR:
       return node->data.v;
@@ -48,15 +48,17 @@ char* gen_node_str(struct gen_node_t* node) {
       str[0] = '%';
       return str;
     case Q_CONST:
-      sprintf(str, "%d", node->data.t->value);
+      sprintf(str, "%d", node->data.c);
       return str;
   }
-  return 0;
+  return str;
 }
 
 big_block* new_block() {
-  big_block* new_block = calloc(1, sizeof(big_block));
+  big_block* new_block = calloc(1, sizeof(struct big_block));
   new_block->quad_head = calloc(1, sizeof(struct quad_ll));
+  new_block->quad_tail = new_block->quad_head;
+  new_block->block_ind = -1;
   return new_block;
 }
 
@@ -97,32 +99,41 @@ quad* quad_gen(struct gen_node_t* dest, struct gen_node_t* src1,
 // Appends the quads from new to the end of ref.
 // Returns the destination of the last value
 struct gen_node_t* append(big_block* ref, big_block* new) {
-  ref->quad_tail->next = new->quad_head;
-  ref->quad_tail = new->quad_tail;
+  if(ref->num_el == 0){
+    ref->quad_head = new->quad_head;
+    ref->quad_tail = new->quad_tail;
+  } else {
+      ref->quad_tail->next = new->quad_head;
+      ref->quad_tail = new->quad_tail;
+  }
   ref->num_el += new->num_el;
   // We can safely get rid of new
   // This might be the only memory control in this compiler
-  free(new);
+  // free(new);
   return ref->quad_tail->cur.ll_quad->destination;
 }
 
-struct gen_node_t* internal_block(big_block* ref, big_block* new) {
+void internal_block(big_block* ref, big_block* new) {
   struct quad_ll* ll_wrapper = calloc(1, sizeof(struct quad_ll));
   ll_wrapper->is_block = 1;
   ll_wrapper->cur.ll_block = new;
   ref->quad_tail->next = ll_wrapper;
   ref->quad_tail = ll_wrapper;
-  ref->num_el += new->num_el;
-  return ref->quad_tail->cur.ll_quad->destination;
+  ref->num_el ++;
 }
 
 // Structured like this for more of an API interface
 // Underlying data structue changed a lot during development
 void append_quad(big_block* ref, quad* new) {
-  struct quad_ll* ll_wrapper = calloc(1, sizeof(struct quad_ll));
-  ll_wrapper->cur.ll_quad = new;
-  ref->quad_tail->next = ll_wrapper;
-  ref->quad_tail = ll_wrapper;
+  if(ref->num_el == 0){
+    ref->quad_head->cur.ll_quad = new;
+    ref->num_el++;
+  } else {
+    struct quad_ll* ll_wrapper = calloc(1,sizeof(struct quad_ll));
+    ll_wrapper->cur.ll_quad = new;
+    ref->quad_tail->next = ll_wrapper;
+    ref->quad_tail = ll_wrapper;
+  }
 }
 
 struct big_block* create_func(ast_node* funct_head, int* tmp_ctr,
@@ -167,7 +178,8 @@ struct gen_node_t* get_element(ast_node* node, big_block* ref, int* tmp_ctr) {
     return new_const(node->obj.num.val.i);
   }
   //
-  big_block* b1 = descend_ast(node, tmp_ctr, 0);
+  int block_ctr = 0;
+  big_block* b1 = descend_ast(node, tmp_ctr, &block_ctr);
   return append(ref, b1);
 }
 
@@ -186,6 +198,7 @@ struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr) {
   } else if (node->type == AST_funct) {
     return create_func(node, tmp_ctr, node->obj.ident, block_ctr);
   }
+  // return descend_expr_ast(node, tmp_ctr);
   big_block* ret = descend_stmt_ast(node, tmp_ctr, block_ctr);
   *(block_ctr)++;
   return ret;
@@ -217,7 +230,7 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
       n1 = get_element(assign_el->lvalue, ret, tmp_ctr);
       n2 = get_element(assign_el->rvalue, ret, tmp_ctr);
 
-      if (assign_el->opcode != '=' || assign_el->lvalue->type != IDENT) {
+      if (assign_el->opcode != '=' || assign_el->lvalue->type != AST_ident) {
         if (assign_el->opcode == '=') {
           // Left side must be a pointer in this case: It'll have a * or
           // something

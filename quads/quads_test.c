@@ -12,9 +12,9 @@ int main(){
     ast_node* node_n = new_ast_num(n);
     ast_node* binop = new_ast_double(AST_binop, a, node_n, '+');
     ast_node* assign = new_ast_double(AST_assign, b, binop, '=');
-    int* tmp_ctr = 0;
-    int* block_ctr = 0;
-    big_block* block = descend_ast(assign, tmp_ctr,block_ctr);
+    int tmp_ctr = 0;
+    int block_ctr = 0;
+    big_block* block = descend_ast(assign, &tmp_ctr, &block_ctr);
     print_quad_block(block);
 
 

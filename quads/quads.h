@@ -87,6 +87,7 @@ struct quad {
 union ll_pointer {
     quad* ll_quad;
     big_block* ll_block;
+    
 };
 
 struct quad_ll{
