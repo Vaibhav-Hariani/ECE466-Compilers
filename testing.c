@@ -1,4 +1,4 @@
-// #include <stdio.h>
+#include <stdio.h>
 int womp_womp(int a){
     char* b;
     *(b + 1) = 5;
@@ -9,7 +9,14 @@ int womp_womp(int a){
 }
 
 int main(){
-    int a;
-    int b;
-    womp_womp(a);
+    int tmp = 0;
+    int* a = &tmp;
+    
+    printf("%d\n", *a);
+    (*a)++;
+    printf("%d\n", *a);
+
+    // int a;
+    // int b;
+    // womp_womp(a);
 }

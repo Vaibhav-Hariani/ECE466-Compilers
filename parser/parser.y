@@ -124,7 +124,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <sym> field_list param_list;
 
 %nterm <node> opt_expr term_expr expr binop_expr ternop_expr unop_expr assign_expr 
-/* %nterm <node> arg_list */
+%nterm <node> arg_list
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;

@@ -1,14 +1,13 @@
 #include <string.h>
-#include "parser.tab.h"
-#include "symbol.h"
+#include "expr.h"
 
 // union generic_node{
 //     int 
 // }
-enum node_type{
+enum Q_TYPE{
     VAR,
     TMP,
-    CONST
+    Q_CONST
 };
 
 enum QUAD_CODES{
@@ -53,22 +52,23 @@ enum QUAD_CODES{
     //Just enough for now: Super basic 
     
 };
-
 enum scope{
     LOCAL,
     PARAM,
     GLOBAL,
 };
 
-//This should be replaced with something from
-//The AST
-struct ident {
-    char* label;
-    enum scope scope;
-};
-
 struct tmp {
     int value;
+};
+
+struct big_block typedef big_block;
+
+union generic_node{
+    char* v; 
+    struct tmp* t;
+    //Assuming this is just an integer
+    int c;
 };
 
 struct gen_node_t{
@@ -76,12 +76,6 @@ struct gen_node_t{
     union generic_node data;
 };
 
-union generic_node{
-    struct ident* v; 
-    struct tmp* t;
-    //Assuming this is just an integer
-    int c;
-};
 
 struct quad {
     int op;
@@ -119,4 +113,7 @@ struct big_block {
 
 // This operates on a single AST, of undetermined type
 // Count temps so they can tick up, clear when a single AST Node is complete 
-struct quad* generate_quads(struct ast_node node);
+struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr);
+struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr);
+struct big_block* descend_stmt_ast(ast_node* node, int* tmp_ctr, int* block_ctr);
+void print_quad_block(big_block* block);

@@ -51,7 +51,7 @@ ast_node* new_ast_list(ast_node* head){
 
 ast_node* append_ast_list(ast_node* root, ast_node* new){
   if(root->type != AST_list){
-    yyerror("List was not a list");
+    // yyerror("List was not a list");
     exit(1);
   }
   struct list_node* head = root->obj.l;
@@ -113,7 +113,7 @@ ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op) {
       struct funct* function = calloc(1, sizeof(struct funct));
       function->name= expr1;
       if(expr2->type !=AST_list) {
-        yyerror("Function Call args are not of type list");
+        // yyerror("Function Call args are not of type list");
         exit(1);
       }
       function->args = expr2->obj.l;
@@ -122,7 +122,7 @@ ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op) {
       break;
 
     default:
-      yyerror("Not a real binop");
+      // yyerror("Not a real binop");
       exit(1);
       break;
   }

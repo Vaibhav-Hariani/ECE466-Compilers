@@ -22,5 +22,7 @@ parser: flex bison $(PARSER_UTIL_C) $(PARSER_OUT_C)
 debug_parser: flex bison_debug $(PARSER_UTIL_C) $(PARSER_OUT_C)
 	gcc -o parser/parser_debug.out $(CFLAGS) -g parser/parser.tab.c lexer/lex.yy.c $(PARSER_UTIL_C) $(PARSER_OUT_C)
 
+test_quads:
+	gcc -o quads/test.out $(CFLAGS) -g quads/quads_test.c quads/quads.c parser/util/expr.c $(PARSER_OUT_C) $(PARSER_OUT_H)
 clean:
 	rm -rf *.h.gch parser/*.out lexer/lex.yy.c parser/parser.tab.*
