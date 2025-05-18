@@ -36,6 +36,9 @@ void print_quad_block(big_block* block) {
 }
 
 void gen_node_str(struct gen_node_t* node) {
+  if(node == 0){
+    return;
+  }
   switch (node->type) {
     case VAR:
       printf("%s ",node->data.v);
