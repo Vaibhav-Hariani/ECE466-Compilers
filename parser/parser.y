@@ -60,6 +60,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
     #include "util/symbol.h"
     #include "util/data.h"
     #include "out/expr_out.h"
+    #include "out/stmt_out.h"
     #include "out/symtab_out.h"
 	#include "../quads/util/quads.h"
 	#include "../quads/out/quads_out.h"
@@ -199,6 +200,7 @@ function_def: /*does not support k&r style*/
 					@3.last_line, 1);	// insert params
 				insert_list(tab, $3->sym, SCO_FUNC,
 					@3.last_line, 1);	// insert compound statement
+				print_stmt_list($3->stmt);
 				$$ = $2;
 			} else {
 				del_sym_list($3->sym);
@@ -277,13 +279,14 @@ decl_or_stmt_list:
 |	decl_or_stmt_list declaration {
 		$$ = $1;
 		if ($2 != NULL) {
-			$2->prev = $$->sym;
+			list_start($2)->prev = $$->sym;
 			$$->sym = $2;
 		}
 	}
 |	decl_or_stmt_list statement {
 		$$ = $1;
-		$$->stmt->next = $2;
+		$$->stmt = append_stmt($$->stmt, $2);
+		// print_stmt($$->stmt);
 	}
 ;
 
@@ -956,6 +959,11 @@ unop_expr:
 |	'&' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '&', PREFIX, strdup(filename), @2.first_line);}
 |	 '*' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '*', PREFIX, strdup(filename), @2.first_line);}
 |	SIZEOF unop_expr	{$$ = new_ast_single($2, SIZEOF, PREFIX, strdup(filename), @2.first_line);}
+;
+
+arg_list: %empty { $$ = new_ast_list(0);} 
+|   assign_expr { $$=new_ast_list($1);}
+|   arg_list ',' assign_expr %prec POSTFIX { $$ = append_ast_list($1, $3);}
 ;
 
 binop_expr:

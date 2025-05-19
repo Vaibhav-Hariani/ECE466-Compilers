@@ -2,8 +2,8 @@
 CFLAGS = -Wall -Wno-abi -I ./lexer -I ./parser -I ./parser/util -I ./symtab/out
 PARSER_UTIL_C = parser/util/expr.c parser/util/stmt.c parser/util/table.c parser/util/symbol.c parser/util/data.c
 PARSER_UTIL_H = parser/util/expr.h parser/util/stmt.h parser/util/table.h parser/util/symbol.h parser/util/data.h
-PARSER_OUT_C = parser/out/expr_out.c parser/out/symtab_out.c
-PARSER_OUT_H = parser/out/expr_out.h parser/out/symtab_out.h
+PARSER_OUT_C = parser/out/expr_out.c parser/out/stmt_out.c parser/out/symtab_out.c
+PARSER_OUT_H = parser/out/expr_out.h parser/out/stmt_out.c parser/out/symtab_out.h
 QUADS_OUT_H = quads/out/quads_out.h 
 QUADS_OUT_C =  quads/out/quads_out.c
 QUADS_UTIL_H = quads/util/quads.h
