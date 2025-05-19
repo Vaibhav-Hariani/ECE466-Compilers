@@ -45,16 +45,6 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
     ast_data_t *data;
     ast_sym_t *sym;
     ast_tab_t *tab;
-	struct ast_scal *scal;
-	struct ast_var *var;
-	struct ast_ptr *ptr;
-	struct ast_ary *ary;
-	struct ast_param *param;
-	struct ast_func *func;
-	struct ast_stru *stru;
-	struct ast_unio *unio;
-	struct ast_enu *enu;
-	struct ast_label *label;
 };
 
 %code requires {
@@ -141,8 +131,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 
 prog:
 	%empty	{$$ = NULL;}
-|	prog assign_expr ';'	{int a = 0; int b = 0; big_block* bb = descend_ast($2,&a, &b); print_quad_block(bb);
-	$$ = NULL;}
+|	prog declaration_or_fndef	{$$ = NULL;}
 ;
 
 declaration_or_fndef:
@@ -221,13 +210,15 @@ function_def: /*does not support k&r style*/
 ;
 
 //I'm assuming most of these take the form of the compound statement
-statement:
-	compound_statement {
+statement: compound_statement {
 		insert_list(tab, $1, SCO_BLOCK, @1.last_line, 1);
 		$$ = $1;
 	}
-|	labeled_statement {$$= NULL;}
-|	expr_statement {$$= NULL;}
+|	labeled_statement {insert(tab, $1, SCO_BLOCK, @1.last_line, 1);
+					$$ = $1;
+	}
+|	expr_statement {$$= insert(tab, $1, SCO_BLOCK, @1.last_line, 1);
+					$$ = $1;}
 |	select_statement {$$= NULL;}
 |	iter_statement {$$= NULL;}
 |	jmp_statement {$$= NULL;}

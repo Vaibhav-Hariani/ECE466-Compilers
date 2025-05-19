@@ -81,6 +81,8 @@ struct ast_node {
     int type;
     //the object itself
     union ast_node_t obj;   
+    //Because for some reason this is necessary for symtab lookups
+    int line_num;
 } typedef ast_node;
 
 

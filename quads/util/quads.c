@@ -53,6 +53,7 @@ quad* quad_gen(struct gen_node_t* dest, struct gen_node_t* src1,
 // Appends the quads from new to the end of ref.
 // Returns the destination of the last value
 struct gen_node_t* append(big_block* ref, big_block* new) {
+  
   if (ref->num_el == 0) {
     ref->quad_head = new->quad_head;
     ref->quad_tail = new->quad_tail;
@@ -90,13 +91,13 @@ void append_quad(big_block* ref, quad* new) {
   }
 }
 
-struct big_block* create_func(ast_node* funct_head, int* tmp_ctr,
-                              char* func_label, int* block_ctr) {
+struct big_block* init_func(ast_node* funct_head, int* tmp_ctr,
+                            char* func_label, int* block_ctr) {
   // Stack holds the args in order based on arg_begin.
   // This should just be another descent, but with a named big block?
   big_block* ret = new_block();
   ret->block_ind = -1;
-  ret->block_label = func_label;
+  ret->func_label = func_label;
   // We only give blocks labels if they're permeanent
 
   // //Some way to descend the AST from the new head
@@ -110,39 +111,63 @@ struct big_block* create_func(ast_node* funct_head, int* tmp_ctr,
   return ret;
 }
 
-// Only support while loops
-// While loops are while and expr
-// On expr they should exit
-// breaks during a while loop should jmp to the surrounding block end.
-struct big_block* create_loop(ast_node* loop_head, int* tmp_ctr,
-                              char* func_label, int* block_ctr) {
-  // Stack holds the args in order based on arg_begin.
-  // This should just be another descent, but with a named big block?
-  big_block* ret = new_block();
-  ret->block_ind = *block_ctr;
-  cond =
-      // Treat like a compound statement::
 
-      // //Some way to descend the AST from the new head
-      // big_block* next_block = descend_ast(funct_head->obj.);
-      big_block * next_block;
-  if (next_block->block_ind > 0) {
-    internal_block(ret, next_block);
-  } else {
-    append(ret, next_block);
+//In outer scope, need to track number of functions encountered
+struct big_block* function_def(ast_sym* definition, int func_ctr){
+
+  big_block* ret = new_block();
+  ret->func_label = definition.name;
+  ret->block_ind=0;
+  int tmp_ctr = 0;
+  int block_ctr = 1;
+
+  for (statement_obj in definition){
+    switch (statement_obj.type) {
+      //Declarations are ignored
+      case expr:
+        big_block* tmp = descend_expr_ast(statement_obj.expr, &tmp_ctr);
+        append(ret, tmp);
+      case stmt:
+        big_block* final = 
+
+
+    }
+       
   }
-  return ret;
+  
+
 }
 
+//3 aspects to a loop
+//condition checking, loop body, exit node
+// struct big_block* create_loop(ast_node* loop_head, int* tmp_ctr,
+//                               char* func_label, int* block_ctr) {
+//   // Stack holds the args in order based on arg_begin.
+//   // This should just be another descent, but with a named big block?
+//   big_block* ret = new_block();
+//   ret->block_ind = *block_ctr;
+//   (*block_ctr)++;
 
-// ast_sym_t* symtab_lookup(char* ident) {
-//   ast_sym_t* ret = calloc(0, sizeof(ast_sym_t));
-//   ret->name = ident;
-//   ret->sym_type = SYM_VAR;
+//   //Iterate over statements in compound statement associated with loop                                
+//   while(loop_head.next != NULL){
+//     big_block* next = descend_ast(loop_head.next, tmp_ctr, block_ctr, ret);
+//     loop_head = loop_head.next;
+//   }
+
+//   if (next_block->block_ind > 0) {
+//     internal_block(ret, next_block);
+//   } else {
+//     append(ret, next_block);
+//   }
+//   return ret;
+// }
+
+// ast_sym_t* symtab_lookup(node) {
 // }
 
 // Descends an AST_tree given a node, returning the final element
 // If the node can't be descended, return the value
+//Only used for expression descent
 struct gen_node_t* get_element(ast_node* node, big_block* ref, int* tmp_ctr) {
   // If this is not a constant or an expression
   if (node == NULL) {
@@ -157,14 +182,13 @@ struct gen_node_t* get_element(ast_node* node, big_block* ref, int* tmp_ctr) {
     return new_const(node->obj.num.val.i);
   }
   //
-  int block_ctr = 0;
-  big_block* b1 = descend_ast(node, tmp_ctr, &block_ctr);
+  int block_ctr = -1;
+  big_block* b1 = descend_ast(node, tmp_ctr, &block_ctr, 0);
   return append(ref, b1);
 }
 
 int parse_assign_q_code(int parser_code) { return parser_code - Q_ADD; };
 
-// entrypoint: Pass in a node and a tmp counter
 struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr) {
   // if type is a statement, descend AST_STMT
   // Should always be the case on the very first node
@@ -172,26 +196,26 @@ struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr) {
   // For testing, always descend as though it's an expression
   if (node->type < 200) {
     return descend_expr_ast(node, tmp_ctr);
-    // For function declarations, pass in the function name: again, should
-    // only happen at
-  } else if (node->type == AST_funct) {
-    return create_func(node, tmp_ctr, node->obj.ident, block_ctr);
+
+  // big_block* ret = descend_stmt_ast(node, tmp_ctr, block_ctr, parent);
+    // (*block_ctr)++;
+    return ret;
   }
-  // return descend_expr_ast(node, tmp_ctr);
-  big_block* ret = descend_stmt_ast(node, tmp_ctr, block_ctr);
-  (*block_ctr)++;
-  return ret;
 }
 
-struct big_block* descend_stmt_ast(ast_node* node, int* tmp_ctr,
-                                   int* block_ctr) {
-  // If no block name is provided for a function definition or whatnot,
+struct big_block* descend_stmt_ast(ast_node* node, int* tmp_ctr, int* block_ctr,
+                                   big_block* parent) {
+  // If it's a statement that inits a new block (conditions, loops, functs),
+  // increment block ctr
+
   big_block* ret = new_block();
   ret->block_ind = *block_ctr;
   struct gen_node_t* n1;
   struct gen_node_t* n2;
-
   return ret;
+  // On statement type
+  // If it's a
+  // switch(node.op)
 }
 
 struct gen_node_t* get_ptr_el(ast_node* node, big_block* ret, int* tmp_ctr) {
@@ -301,7 +325,7 @@ struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr) {
           quad* inter_quad = quad_gen(NULL, n1, n2, Q_CMP);
           struct gen_node_t* tmp = new_tmp(*tmp_ctr);
           (*tmp_ctr)++;
-          final_quad = quad_gen(tmp, )
+          final_quad = quad_gen(tmp, NULL, NULL, op);
 
           append_quad(ret, inter_quad);
 

@@ -1,7 +1,7 @@
 #include <string.h>
 #include "expr.h"
 #include <stdio.h>
-
+#include <stdbool.h>
 // union generic_node{
 //     int 
 // }
@@ -9,14 +9,6 @@ enum Q_TYPE{
     VAR,
     TMP,
     Q_CONST
-};
-
-enum CC_CODES {
-    L_EQ = 50,
-    L_GR = 51,
-    L_GEQ = 52,
-    L_LEQ = 53,
-    L_LT = 54,
 };
 
 enum QUAD_CODES{
@@ -109,27 +101,35 @@ struct quad {
 
 //Singly linked list of quads or blocks
 //If it's a block, the index get's used at print time
-union ll_pointer {
-    quad* ll_quad;
-    big_block* ll_block;
-    
+
+struct ll_nodes{
+    quad* cur;
+    struct ll_nodes* next;
 };
 
 struct quad_ll{
-    union ll_pointer cur;
-    int is_block;
-    struct quad_ll* next;
+    struct ll_nodes* head;
+    struct ll_nodes* tail;
 };
 
 struct big_block {
     //Array of pointers
-    struct quad_ll* quad_head;
-    struct quad_ll* quad_tail;
+    struct quad_ll quads_list;
     int num_el;
     int block_ind;
-    char* block_label;
+    int func_ind;
+    char* func_label;
+
 } typedef big_block;
 
+//A linked list of 
+struct CFG {
+    big_block* block;
+    big_block* true_exit;
+    big_block* false_exit;
+    //
+    bool term_block;
+};
 
 //API
 //When control flow logic is detected, generate quads for each of those trees, and then append them to a new big_block
@@ -139,6 +139,6 @@ struct big_block {
 
 // This operates on a single AST, of undetermined type
 // Count temps so they can tick up, clear when a single AST Node is complete 
-struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr);
+struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr, big_block* parent);
 struct big_block* descend_expr_ast(ast_node* node, int* tmp_ctr);
-struct big_block* descend_stmt_ast(ast_node* node, int* tmp_ctr, int* block_ctr);
+struct big_block* descend_stmt_ast(ast_node* node, int* tmp_ctr, int* block_ctr, big_block* parent);
