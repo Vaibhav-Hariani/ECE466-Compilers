@@ -15,9 +15,9 @@ EXTERN	FLOAT	FOR	GOTO	IF	INLINE	INT	LONG
 REGISTER	RESTRICT	RETURN	SHORT	SIGNED	STATIC	
 STRUCT	SWITCH	TYPEDEF	UNION	UNSIGNED	VOID	
 VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
-%token 
+/* %token 
     PLUSPLUS "++" 
-    MINUSMINUS "--"
+    MINUSMINUS "--" */
 %left ','
 %right '=' PLUSEQ MINUSEQ DIVEQ TIMESEQ MODEQ SHLEQ SHREQ ANDEQ OREQ XOREQ
 %right '?' ':'	/* This is where yacc will put it */
@@ -31,8 +31,10 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %left SHL SHR
 %left '+' '-'
 %left '*' '/' '%'
-%right SIZEOF PREFIX '!' '~' 
+%right SIZEOF PREFIX '!' '~'
 %left '(' ')' '[' ']'  POSTFIX PLUSPLUS MINUSMINUS INDSEL '.'
+//Necessary to resolve shift-reduce
+%nonassoc ELSE
 
 %union {
 	char *i;
@@ -59,6 +61,8 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
     #include "util/data.h"
     #include "out/expr_out.h"
     #include "out/symtab_out.h"
+	#include "../quads/util/quads.h"
+	#include "../quads/out/quads_out.h"
     void yyerror(const char *format, ...);
 
 	typedef struct ast_node ast_node;
@@ -110,7 +114,8 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <sym> param_declarator abstract_declarator direct_abstract_declarator;
 %nterm <sym> field_list param_list;
 
-%nterm <node> term_expr expr binop_expr ternop_expr unop_expr assign_expr arg_list
+%nterm <node> opt_expr term_expr expr binop_expr ternop_expr unop_expr assign_expr 
+%nterm <node> arg_list
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
@@ -203,6 +208,27 @@ function_def: /*does not support k&r style*/
 	}
 ;
 
+//I'm assuming most of these take the form of the compound statement
+statement: compound_statement {
+		insert_list(tab, $1, SCO_BLOCK, @1.last_line, 1);
+		$$ = $1;
+	}
+|	labeled_statement {insert(tab, $1, SCO_BLOCK, @1.last_line, 1);
+					$$ = $1;
+	}
+|	expr_statement {$$= insert(tab, $1, SCO_BLOCK, @1.last_line, 1);
+					$$ = $1;}
+|	select_statement {$$= NULL;}
+|	iter_statement {$$= NULL;}
+|	jmp_statement {$$= NULL;}
+;
+
+
+//Statement declarations
+opt_expr: %empty {$$=NULL;}
+|   term_expr {$$=$1;}
+;
+
 compound_statement:
 	'{' decl_or_stmt_list '}'	{
 		ast_sym_t *temp;
@@ -214,10 +240,37 @@ compound_statement:
 			}
 			temp = temp->prev;
 		}
-
 		$$ = $2;
 	}
 ;
+
+labeled_statement: IDENT ':' statement {$$=NULL;}
+//Ternop expressions is equivalent to condtional expressions/constant expresisons
+|   CASE ternop_expr ':' statement {$$=NULL;}
+|   DEFAULT ':' statement {$$=NULL;}
+;
+
+
+select_statement: IF '(' expr ')' statement {$$=NULL;}
+|   IF '(' expr ')' statement ELSE statement {$$=NULL;}
+|   SWITCH '(' expr ')' statement {$$=NULL;}
+;
+
+expr_statement:	opt_expr ';' {$$=NULL;}
+
+
+iter_statement: WHILE '(' expr_statement ')' statement {$$=NULL;}
+|   DO statement WHILE '(' expr_statement ')' ';' {$$=NULL;}
+|   FOR '(' opt_expr ';' opt_expr ';'  opt_expr ';' ')' statement {$$=NULL;}
+//Not including declarative iterations
+;
+
+jmp_statement: GOTO IDENT ';' {$$=NULL;}
+|   CONTINUE ';' {$$=NULL;}
+|   BREAK ';'  {$$=NULL;}
+|   RETURN opt_expr ';' {$$=NULL;}
+;
+
 
 decl_or_stmt_list:
 	%empty	{$$ = new_ast_cpst(NULL, NULL);}
@@ -905,7 +958,6 @@ unop_expr:
 |	SIZEOF unop_expr	{$$ = new_ast_single($2, SIZEOF, PREFIX, strdup(filename), @2.first_line);}
 ;
 
-
 binop_expr:
 	unop_expr	{$$=$1;}
 |	binop_expr '+' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '+', strdup(filename), @1.first_line);}
@@ -945,6 +997,91 @@ assign_expr:
 |	unop_expr OREQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, OREQ, strdup(filename), @1.first_line);}
 |	unop_expr XOREQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, XOREQ, strdup(filename), @1.first_line);}
 ;
+
+arg_list: %empty { $$ = new_ast_list(0);} 
+|   assign_expr { $$=new_ast_list($1);}
+|   arg_list ',' assign_expr %prec POSTFIX { $$ = append_ast_list($1, $3);}
+;
+
+/* declaration: decl_spec init_list ';' */
+
+/* init_list: %empty
+|   init_decl
+|   init_list ',' init_decl   
+; */
+
+// The second line is optional
+/* init_decl: declarator
+|   declarator = init
+; */
+
+
+/* decl_spec: %empty
+| storage_class decl_spec
+| type_spec decl_spec
+| type_qual decl_spec
+| function_spec decl_spec 
+; */
+
+storage_class: EXTERN
+|   STATIC
+|   TYPEDEF
+|   STATIC
+|   AUTO
+|   REGISTER
+;
+
+type_spec:   VOID
+|   CHAR
+|   SHORT
+|   INT
+|   LONG
+|   FLOAT
+|   DOUBLE
+|   SIGNED
+|   UNSIGNED
+|   BOOL
+|   COMPLEX
+/* |   struct_union_spec */
+;
+/* |   enum_spec //Optional 
+|   typedef_name //Also optional
+; */
+
+/* struct_union_spec: STRUCT '{' struct_decl_list '}'
+|   STRUCT IDENT '{' struct_decl_list '}'
+|   STRUCT IDENT
+|   UNION '{' struct_decl_list '}'
+|   UNION IDENT '{' struct_decl_list '}'
+|   UNION IDENT
+;
+struct_decl_list: struct_decl
+| struct_decl_list struct_decl
+;
+
+struct_decl: struct_decl ;
+ */
+/* 
+function_spec:  */
+
+
+/* keyword: STRUCT IDENT
+| CHAR
+| BOOL    :) slomp blup 
+| COMPLEX
+| mult_keyword COMPLEX
+| IMAGINARY
+| mult_keyword IMAGINARY
+
+| 
+
+mult_keyword: LONG
+| DOUBLE
+| FLOAT
+| mult_keyword mult_keyword
+
+;
+ */
 
 %%
 
