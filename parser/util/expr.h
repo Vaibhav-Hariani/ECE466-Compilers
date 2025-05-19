@@ -1,7 +1,10 @@
 #ifndef EXPR_H
 #define EXPR_H
 
+#include <stdlib.h>
+
 #include "yylval.h"
+#include "../parser.tab.h"
 
 enum node_type {
     AST_binop=0,
@@ -76,7 +79,9 @@ typedef union ast_node_t {
 } ast_node_t;
 
 
-struct ast_node { 
+struct ast_node {
+    char *filename;
+    int line;
     int is_lval;
     //Reference to what obj is
     int type;
@@ -86,27 +91,24 @@ struct ast_node {
     int line_num;
 } typedef ast_node;
 
+ast_node* new_ast_ident(char* c, char *filename, int line);
+ast_node* new_ast_num(TypedNumber n, char *filename, int line);
+ast_node* new_ast_charlit(char c, char *filename, int line);
 
+ast_node* new_ast_string(SizedString s, char *filename, int line);
 
-ast_node* new_ast_ident(char* c);
-ast_node* new_ast_num(TypedNumber n);
-ast_node* new_ast_charlit(char c);
-
-ast_node* new_ast_string(SizedString s);
-
-ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op);
+ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op, char *filename, int line);
 
 // //Just sets a flag if desired
 // ast_node* new_ast_lvalue(ast_node* expr);
 
-ast_node* ast_array_exp(ast_node* expr1, ast_node* expr2);
+ast_node* ast_array_exp(ast_node* expr1, ast_node* expr2, char *filename, int line);
 
 ast_node* new_ast_list(ast_node* head);
 ast_node* append_ast_list(ast_node* tail, ast_node* new);
 
+ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2, ast_node* expr3, char *filename, int line);
 
-ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2, ast_node* expr3);
-
-ast_node* new_ast_single(ast_node* expr, int op, int dir);
+ast_node* new_ast_single(ast_node* expr, int op, int dir, char *filename, int line);
 
 #endif // EXPR_H

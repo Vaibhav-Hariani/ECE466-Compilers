@@ -3,6 +3,8 @@
 
 #include "../util/expr.h"
 
+typedef struct ast_node ast_node;
+
 //Only function that needs to be exposed
 ast_node* print_ast(ast_node* expr);
 

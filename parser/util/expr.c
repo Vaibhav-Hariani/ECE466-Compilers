@@ -1,36 +1,40 @@
 #include "expr.h"
 
-#include <stdlib.h>
-
-#include "../parser.tab.h"
-
 #define new_ast_node calloc(1, sizeof(struct ast_node))
 
-ast_node* new_ast_ident(char* c) {
+ast_node* new_ast_ident(char* c, char *filename, int line) {
   ast_node* node = new_ast_node;
   node->type = AST_ident;
   node->obj.ident = c;
+  node->filename = filename;
+  node->line = line;
   return node;
 }
 
-ast_node* new_ast_num(TypedNumber n) {
+ast_node* new_ast_num(TypedNumber n, char *filename, int line) {
   ast_node* node = new_ast_node;
   node->type = AST_num;
   node->obj.num = n;
+  node->filename = filename;
+  node->line = line;
   return node;
 }
 
-ast_node* new_ast_charlit(char c) {
+ast_node* new_ast_charlit(char c, char *filename, int line) {
   ast_node* node = new_ast_node;
   node->type = AST_num;
   node->obj.charlit = c;
+  node->filename = filename;
+  node->line = line;
   return node;
 }
 
-ast_node* new_ast_string(SizedString s) {
+ast_node* new_ast_string(SizedString s, char *filename, int line) {
   ast_node* node = new_ast_node;
   node->type = AST_string;
   node->obj.str = s;
+  node->filename = filename;
+  node->line = line;
   return node;
 }
 
@@ -67,18 +71,18 @@ ast_node* append_ast_list(ast_node* root, ast_node* new){
   return root;
 }
 
-
-
-ast_node* ast_array_exp(ast_node* expr1, ast_node* expr2){
-  ast_node* inner_expr = new_ast_double(AST_binop, expr1, expr2, '+');
-  return new_ast_single(inner_expr, '*', PREFIX);
+ast_node* ast_array_exp(ast_node* expr1, ast_node* expr2, char *filename, int line){
+  ast_node* inner_expr = new_ast_double(AST_binop, expr1, expr2, '+', strdup(filename), line);
+  return new_ast_single(inner_expr, '*', PREFIX, filename, line);
 }
 
 
 // Given that both both children of a binop are numbers or char literals, this should convert them into a new numlit/charlit.
 
-ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op) {
+ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op, char *filename, int line) {
   ast_node* node = new_ast_node;
+  node->filename = filename;
+  node->line = line;
   struct binop* bin = calloc(1, sizeof(struct binop));
 
   switch (type) {
@@ -130,7 +134,7 @@ ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op) {
 }
 
 ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2,
-                         ast_node* expr3) {
+                         ast_node* expr3, char *filename, int line) {
   ast_node* node = new_ast_node;
   node->type = AST_ternop;
   struct ternop* obj = calloc(1, sizeof(struct ternop));
@@ -138,10 +142,12 @@ ast_node* new_ast_ternop(int type, ast_node* expr1, ast_node* expr2,
   obj->expr_2 = expr2;
   obj->expr_3 = expr3;
   node->obj.t = obj;
+  node->filename = filename;
+  node->line = line;
   return node;
 }
 
-ast_node* new_ast_single(ast_node* expr, int op, int dir) {
+ast_node* new_ast_single(ast_node* expr, int op, int dir, char *filename, int line) {
   ast_node* node = new_ast_node;
   node->type = AST_unop;
   struct unop* obj = calloc(1, sizeof(struct unop));
@@ -152,5 +158,7 @@ ast_node* new_ast_single(ast_node* expr, int op, int dir) {
   // Allowing lvalue status to "trickle up" through unops
   // This should hopefully make my life easier going forward
   node->is_lval = expr->is_lval;
+  node->filename = filename;
+  node->line = line;
   return node;
 }

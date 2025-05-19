@@ -41,7 +41,9 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 	char c;
 	TypedNumber n;
     SizedString s;
-    struct ast_node *node;
+    ast_node *node;
+	ast_stmt_t *stmt;
+	ast_cpst_t *cpst;
     ast_data_t *data;
     ast_sym_t *sym;
     ast_tab_t *tab;
@@ -53,6 +55,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 	#include <stdarg.h>
     #include "yylval.h"
     #include "util/expr.h"
+	#include "util/stmt.h"
     #include "util/table.h"
     #include "util/symbol.h"
     #include "util/data.h"
@@ -62,6 +65,9 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 	#include "../quads/out/quads_out.h"
     void yyerror(const char *format, ...);
 
+	typedef struct ast_node ast_node;
+	typedef struct ast_stmt ast_stmt_t;
+	typedef struct ast_cpst ast_cpst_t;
 	typedef struct ast_tab ast_tab_t;
 	typedef struct ast_sym ast_sym_t;
 	typedef struct ast_data ast_data_t;
@@ -93,16 +99,9 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <data> signed_type_spec unsigned_type_spec char_type_spec;
 %nterm <data> pointer;
 %nterm <data> type_name;
+%nterm <cpst> compound_statement decl_or_stmt_list
+%nterm <stmt> statement
 %nterm <sym> prog declaration_or_fndef function_def;
-
-
-//Defining and expanding the definition of statements
-%nterm <sym> decl_or_stmt decl_or_stmt_list 
-
-%nterm <sym> statement compound_statement labeled_statement
-%nterm <sym> expr_statement select_statement iter_statement jmp_statement
-
-
 %nterm <sym> declaration declaration_spec untyped_declaration_spec param_declaration;
 %nterm <sym> init_declarator init_declarator_list;
 %nterm <sym> type_spec;
@@ -198,11 +197,11 @@ function_def: /*does not support k&r style*/
 			if (!insert(tab, $2, SCO_FILE, __INT_MAX__, 1)) {	// insert function
 				insert_list(tab, $2->data->node->func->params, SCO_FUNC,
 					@3.last_line, 1);	// insert params
-				insert_list(tab, $3, SCO_FUNC,
+				insert_list(tab, $3->sym, SCO_FUNC,
 					@3.last_line, 1);	// insert compound statement
 				$$ = $2;
 			} else {
-				del_sym_list($3);
+				del_sym_list($3->sym);
 				$$ = NULL;
 			}
 		}
@@ -233,7 +232,8 @@ opt_expr: %empty {$$=NULL;}
 compound_statement:
 	'{' decl_or_stmt_list '}'	{
 		ast_sym_t *temp;
-		temp = $2;
+
+		temp = $2->sym;
 		while (temp != NULL) {
 			if (temp->stg_type == STG_NONE) {
 				temp->stg_type = STG_AUTO_LOC;
@@ -273,22 +273,29 @@ jmp_statement: GOTO IDENT ';' {$$=NULL;}
 
 
 decl_or_stmt_list:
-	%empty	{$$ = NULL;}
-|	decl_or_stmt_list decl_or_stmt {
-		if ($2 == NULL) {
-			$$ = $1;
-		} else {
-			$2->prev = $1;
-			$$ = $2;
+	%empty	{$$ = new_ast_cpst(NULL, NULL);}
+|	decl_or_stmt_list declaration {
+		$$ = $1;
+		if ($2 != NULL) {
+			$2->prev = $$->sym;
+			$$->sym = $2;
 		}
+	}
+|	decl_or_stmt_list statement {
+		$$ = $1;
+		$$->stmt->next = $2;
 	}
 ;
 
-decl_or_stmt:
-	declaration {$$ = $1;}
-|	statement {$$ = NULL;}
+statement:
+	compound_statement {
+		insert_list(tab, $1->sym, SCO_BLOCK, @1.last_line, 1);
+		$$ = new_ast_stmt(new_ast_block($1), STMT_BLOCK, NULL);
+	}
+|	term_expr ';' {
+		$$ = new_ast_stmt(new_ast_expr($1), STMT_EXPR, NULL);
+	}
 ;
-
 
 declaration:
 	struct_type_def ';' {$$ = $1;}
@@ -921,76 +928,74 @@ comma_opt:
 
 term_expr:
 	assign_expr	{$$=$1;}
-|	term_expr ',' assign_expr	{$$ = new_ast_double(AST_binop, $1, $3, ',');} 
+|	term_expr ',' assign_expr	{$$ = new_ast_double(AST_binop, $1, $3, ',', strdup(filename), @2.first_line);}
 
 expr:
-	NUM	{$$ = new_ast_num($1);}
-|	IDENT	{$$ = new_ast_ident($1);}
-|	CHARLIT	{$$ = new_ast_charlit($1);}
-|	STRING	{$$ = new_ast_string($1);}
+	NUM	{$$ = new_ast_num($1, strdup(filename), @1.first_line);}
+|	IDENT	{$$ = new_ast_ident($1, strdup(filename), @1.first_line);}
+|	CHARLIT	{$$ = new_ast_charlit($1, strdup(filename), @1.first_line);}
+|	STRING	{$$ = new_ast_string($1, strdup(filename), @1.first_line);}
 |	'(' term_expr ')'	{$$=$2;}
 ;
 
 unop_expr:
 	expr {$$=$1;}
-|	unop_expr PLUSPLUS %prec POSTFIX	{ $$ = new_ast_single($1, PLUSPLUS, POSTFIX);}
-|	unop_expr MINUSMINUS %prec POSTFIX	{ $$ = new_ast_single($1, MINUSMINUS, POSTFIX);}
-|	PLUSPLUS unop_expr %prec PREFIX	{ $$ = new_ast_single($2, PLUSPLUS, PREFIX);}
-|	MINUSMINUS unop_expr %prec PREFIX	{ $$ = new_ast_single($2, MINUSMINUS, PREFIX);}
-|	unop_expr INDSEL IDENT	{ $$=new_ast_double(AST_binop, $1, new_ast_ident($3), INDSEL);}
-|	unop_expr '.' IDENT	{ $$ = new_ast_double(AST_binop, $1, new_ast_ident($3), '.');}
+|	unop_expr "++" %prec POSTFIX	{ $$ = new_ast_single($1, PLUSPLUS, POSTFIX, strdup(filename), @1.first_line);}
+|	unop_expr "--" %prec POSTFIX	{ $$ = new_ast_single($1, MINUSMINUS, POSTFIX, strdup(filename), @1.first_line);}
+|	"++" unop_expr %prec PREFIX	{ $$ = new_ast_single($2, PLUSPLUS, PREFIX, strdup(filename), @2.first_line);}
+|	"--" unop_expr %prec PREFIX	{ $$ = new_ast_single($2, MINUSMINUS, PREFIX, strdup(filename), @2.first_line);}
+|	unop_expr INDSEL IDENT	{ $$=new_ast_double(AST_binop, $1, new_ast_ident($3, strdup(filename), @3.first_line), INDSEL, strdup(filename), @1.first_line);}
+|	unop_expr '.' IDENT	{ $$ = new_ast_double(AST_binop, $1, new_ast_ident($3, strdup(filename), @3.first_line), '.', strdup(filename), @1.first_line);}
 //Helper function that should expand this into what it actually is
-|	unop_expr '['term_expr']'	{ $$= ast_array_exp($1,$3);}
-
-//Original function definition, no longer needed?
-|	unop_expr '(' arg_list ')'	{ $$=new_ast_double(AST_funct, $1, $3, ')');}
-|	'+' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '+', PREFIX);}
-|	'-' unop_expr %prec SIZEOF	{ $$= new_ast_single($2, '-', PREFIX);}
-|	'!' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '!', PREFIX);}
-|	'~' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '~', PREFIX);}
-|	'&' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '&', PREFIX);}
-|	 '*' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '*', PREFIX);}
-|	SIZEOF unop_expr	{$$ = new_ast_single($2, SIZEOF, PREFIX);}
+|	unop_expr '['term_expr']'	{ $$= ast_array_exp($1,$3, strdup(filename), @1.first_line);}
+|	unop_expr '(' arg_list ')'	{ $$=new_ast_double(AST_funct, $1, $3, ')', strdup(filename), @1.first_line);}
+|	'+' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '+', PREFIX, strdup(filename), @2.first_line);}
+|	'-' unop_expr %prec SIZEOF	{ $$= new_ast_single($2, '-', PREFIX, strdup(filename), @2.first_line);}
+|	'!' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '!', PREFIX, strdup(filename), @2.first_line);}
+|	'~' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '~', PREFIX, strdup(filename), @2.first_line);}
+|	'&' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '&', PREFIX, strdup(filename), @2.first_line);}
+|	 '*' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '*', PREFIX, strdup(filename), @2.first_line);}
+|	SIZEOF unop_expr	{$$ = new_ast_single($2, SIZEOF, PREFIX, strdup(filename), @2.first_line);}
 ;
 
 binop_expr:
 	unop_expr	{$$=$1;}
-|	binop_expr '+' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '+');}
-|	binop_expr '-' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '-');}
-|	binop_expr '*' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '*');}
-|	binop_expr '/' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '/');}
-|	binop_expr '%' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '%');}
-|	binop_expr '>' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '>');}
-|	binop_expr '<' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '<');}
-|	binop_expr '&' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '&');}
-|	binop_expr '|' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '|');}
-|	binop_expr '^' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '^');}
-|	binop_expr SHL binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, SHL);}
-|	binop_expr SHR binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, SHR);}
-|	binop_expr EQEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, EQEQ);}
-|	binop_expr NOTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, NOTEQ);}
-|	binop_expr LOGAND binop_expr{ $$=new_ast_double(AST_binop, $1, $3, LOGAND);}
-|	binop_expr LOGOR binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, LOGOR);}
-|	binop_expr LTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, LTEQ);}
-|	binop_expr GTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, GTEQ);}
+|	binop_expr '+' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '+', strdup(filename), @1.first_line);}
+|	binop_expr '-' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '-', strdup(filename), @1.first_line);}
+|	binop_expr '*' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '*', strdup(filename), @1.first_line);}
+|	binop_expr '/' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '/', strdup(filename), @1.first_line);}
+|	binop_expr '%' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '%', strdup(filename), @1.first_line);}
+|	binop_expr '>' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '>', strdup(filename), @1.first_line);}
+|	binop_expr '<' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '<', strdup(filename), @1.first_line);}
+|	binop_expr '&' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '&', strdup(filename), @1.first_line);}
+|	binop_expr '|' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '|', strdup(filename), @1.first_line);}
+|	binop_expr '^' binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, '^', strdup(filename), @1.first_line);}
+|	binop_expr SHL binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, SHL, strdup(filename), @1.first_line);}
+|	binop_expr SHR binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, SHR, strdup(filename), @1.first_line);}
+|	binop_expr EQEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, EQEQ, strdup(filename), @1.first_line);}
+|	binop_expr NOTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, NOTEQ, strdup(filename), @1.first_line);}
+|	binop_expr LOGAND binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, LOGAND, strdup(filename), @1.first_line);}
+|	binop_expr LOGOR binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, LOGOR, strdup(filename), @1.first_line);}
+|	binop_expr LTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, LTEQ, strdup(filename), @1.first_line);}
+|	binop_expr GTEQ binop_expr	{ $$=new_ast_double(AST_binop, $1, $3, GTEQ, strdup(filename), @1.first_line);}
 
 ternop_expr:
 	binop_expr { $$=$1;}
-|	binop_expr '?' binop_expr ':' binop_expr	{ $$=new_ast_ternop(AST_ternop, $1, $3, $5);};
+|	binop_expr '?' binop_expr ':' binop_expr	{ $$=new_ast_ternop(AST_ternop, $1, $3, $5, strdup(filename), @1.first_line);};
 
 assign_expr:
 	ternop_expr	{$$=$1;}
-|	unop_expr '=' assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, '=');}
-|	unop_expr TIMESEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, TIMESEQ);}
-|	unop_expr DIVEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, DIVEQ);}
-|	unop_expr MODEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, MODEQ);}
-|	unop_expr PLUSEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, PLUSEQ);}
-|	unop_expr MINUSEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, MINUSEQ);}
-|	unop_expr SHLEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
-|	unop_expr SHREQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, SHLEQ);}
-|	unop_expr ANDEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, ANDEQ);}
-|	unop_expr OREQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, OREQ);}
-|	unop_expr XOREQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, XOREQ);}
+|	unop_expr '=' assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, '=', strdup(filename), @1.first_line);}
+|	unop_expr TIMESEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, TIMESEQ, strdup(filename), @1.first_line);}
+|	unop_expr DIVEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, DIVEQ, strdup(filename), @1.first_line);}
+|	unop_expr MODEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, MODEQ, strdup(filename), @1.first_line);}
+|	unop_expr PLUSEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, PLUSEQ, strdup(filename), @1.first_line);}
+|	unop_expr MINUSEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, MINUSEQ, strdup(filename), @1.first_line);}
+|	unop_expr SHLEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, SHLEQ, strdup(filename), @1.first_line);}
+|	unop_expr SHREQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, SHLEQ, strdup(filename), @1.first_line);}
+|	unop_expr ANDEQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, ANDEQ, strdup(filename), @1.first_line);}
+|	unop_expr OREQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, OREQ, strdup(filename), @1.first_line);}
+|	unop_expr XOREQ assign_expr	{ $$=new_ast_double(AST_assign, $1, $3, XOREQ, strdup(filename), @1.first_line);}
 ;
 
 arg_list: %empty { $$ = new_ast_list(0);} 
