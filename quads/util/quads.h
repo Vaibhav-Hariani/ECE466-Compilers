@@ -1,8 +1,16 @@
+
+#ifndef QUAD_H
+#define QUAD_H
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <data.h>
+#include <stdlib.h>
+#include "table.h"
 #include "expr.h"
+
+
 // union generic_node{
 //     int
 // }
@@ -85,7 +93,7 @@ union generic_node {
 struct gen_node_t {
   enum Q_TYPE type;
   union generic_node data;
-  void* sym_type;
+  ast_sym_t* symbol;
   //need a way to store symbol type
 };
 
@@ -142,9 +150,13 @@ struct funct_decl {
 
 // This operates on a single AST, of undetermined type
 // Count temps so they can tick up, clear when a single AST Node is complete
+
+big_block* new_block();
 struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr,
                               big_block* parent);
 struct quad_ll* descend_expr_ast(ast_node* node, struct quad_ll* list,
-                                 int* tmp_ctr);
+                                 int* tmp_ctr, ast_tab_t* table);
 struct big_block* descend_stmt_ast(ast_node* node, int* tmp_ctr, int* block_ctr,
                                    big_block* parent);
+
+#endif

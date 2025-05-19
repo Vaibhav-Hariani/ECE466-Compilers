@@ -968,11 +968,9 @@ void yyerror(const char *format, ...){
 	va_end(args);
 }
 
-int main(int argc, char** argv){
+/* int main(int argc, char** argv){
     FILE *file;
     if(argc < 2) {
-        /* yyerror("No File Specified");
-        return 0; */
         yyin = stdin;
 		filename = strdup("stdin");
         fprintf(stderr, "No File Specified \n");
@@ -991,6 +989,6 @@ int main(int argc, char** argv){
         fclose(file);    
     }
 
-    return 0;
+    return 0; */
     /* yyparse();  */
-} 
+/* }  */
