@@ -105,7 +105,7 @@ void opcode_print(int opcode, char** tokens, char* pre_msg, char* post_msg){
 
 }
 
-ast_node* print_ast(struct ast_node* expr) {
+ast_node* print_ast(ast_node* expr) {
   char** tokens = token_labels();
   print_recurse(expr, 0, tokens);
   return expr;

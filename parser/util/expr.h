@@ -17,7 +17,6 @@ enum node_type {
     AST_string,
     AST_charlit,
     AST_num,
-    AST_STMT,
 };
 
 struct ast_node typedef ast_node;
@@ -86,9 +85,7 @@ struct ast_node {
     //Reference to what obj is
     int type;
     //the object itself
-    union ast_node_t obj;   
-    //Because for some reason this is necessary for symtab lookups
-    int line_num;
+    union ast_node_t obj;
 } typedef ast_node;
 
 ast_node* new_ast_ident(char* c, char *filename, int line);
