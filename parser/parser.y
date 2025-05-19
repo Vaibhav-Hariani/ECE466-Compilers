@@ -33,6 +33,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %left '*' '/' '%'
 %right SIZEOF PREFIX '!' '~' 
 %left '(' ')' '[' ']'  POSTFIX PLUSPLUS MINUSMINUS INDSEL '.'
+%nonassoc ELSE
 
 %union {
 	char *i;
@@ -40,7 +41,6 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 	TypedNumber n;
     SizedString s;
     ast_node *node;
-	ast_stmt_t *stmt;
 	ast_cpst_t *cpst;
     ast_data_t *data;
     ast_sym_t *sym;
@@ -96,8 +96,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <data> signed_type_spec unsigned_type_spec char_type_spec;
 %nterm <data> pointer;
 %nterm <data> type_name;
-%nterm <cpst> compound_statement decl_or_stmt_list
-%nterm <stmt> statement
+%nterm <cpst> statement compound_statement decl_or_stmt_list
 %nterm <sym> prog declaration_or_fndef function_def;
 %nterm <sym> declaration declaration_spec untyped_declaration_spec param_declaration;
 %nterm <sym> init_declarator init_declarator_list;
@@ -111,7 +110,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %nterm <sym> param_declarator abstract_declarator direct_abstract_declarator;
 %nterm <sym> field_list param_list;
 
-%nterm <node> term_expr expr binop_expr ternop_expr unop_expr assign_expr arg_list
+%nterm <node> term_expr term_expr_opt expr binop_expr ternop_expr unop_expr assign_expr arg_list
 %token <i> IDENT;
 %token <c> CHARLIT;
 %token <n> NUM;
@@ -232,19 +231,138 @@ decl_or_stmt_list:
 	}
 |	decl_or_stmt_list statement {
 		$$ = $1;
-		$$->stmt = append_stmt($$->stmt, $2);
-		// print_stmt($$->stmt);
+		$$->stmt = append_stmt($$->stmt, $2->stmt);
+		if ($2->sym != NULL) {
+			list_start($2->sym)->prev = $$->sym;
+			$$->sym = $2->sym;
+		}
+		free($2);
 	}
 ;
 
 statement:
-	compound_statement {
+	term_expr ';'	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(new_ast_expr($1), STMT_EXPR, NULL),
+			NULL);
+	}
+|	IF '(' term_expr ')' statement	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(new_ast_if($3, $5->stmt, NULL), STMT_IF, NULL),
+			NULL);
+	}
+|	IF '(' term_expr ')' statement ELSE statement	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(new_ast_if($3, $5->stmt, $7->stmt), STMT_IF, NULL),
+			NULL);
+	}
+|	FOR '(' term_expr_opt ';' term_expr_opt ';' term_expr_opt ')' statement	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(new_ast_for($3, $5, $7, $9->stmt), STMT_IF, NULL),
+			NULL);
+	}
+|	WHILE '(' term_expr ')' statement	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(new_ast_while($3, $5->stmt), STMT_WHILE, NULL),
+			NULL);
+	}
+|	DO statement WHILE '(' term_expr ')'	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(new_ast_dowhile($5, $2->stmt), STMT_DOWHILE, NULL),
+			NULL);
+	}
+|	CONTINUE ';'	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(NULL, STMT_CONTINUE, NULL),
+			NULL);
+	}
+|	BREAK ';'	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(NULL, STMT_BREAK, NULL),
+			NULL);
+	}
+|	SWITCH '(' term_expr ')' statement	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(new_ast_switch($3, $5->stmt), STMT_SWITCH, NULL),
+			NULL);
+	}
+|	GOTO IDENT ';'	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(new_ast_goto(strdup($2)), STMT_GOTO, NULL),
+			new_ast_sym(strdup($2), STG_NA, SYM_LABEL,
+				new_ast_data(0, DATA_LABEL, QUAL_NONE, new_ast_label(0)),
+				strdup(filename), @1.first_line));
+	}
+|	RETURN term_expr ';'	{
+		$$ = new_ast_cpst(
+			new_ast_stmt(new_ast_ret($2), STMT_RETURN, NULL),
+			NULL);
+	}
+|	CASE term_expr ':' statement	{
+		$$ = $4;
+		$$->stmt = new_ast_stmt(new_ast_labelst(LABEL_CASE, $2, $4->stmt), STMT_CASE, NULL);
+	}
+|	DEFAULT ':' statement	{
+		$$ = $3;
+		$$->stmt = new_ast_stmt(new_ast_labelst(LABEL_DEFAULT, NULL, $3->stmt), STMT_DEFAULT, NULL);
+	}
+|	IDENT ':' statement {
+		ast_sym_t *sym;
+
+		$$ = $3;
+		$$->stmt = new_ast_stmt(
+			new_ast_labelst(LABEL_LABEL,
+				new_ast_ident($1, strdup(filename), @1.first_line), $3->stmt),
+			STMT_DEFAULT, NULL);
+		sym = new_ast_sym(strdup($1), STG_NA, SYM_LABEL,
+			new_ast_data(0, DATA_LABEL, QUAL_NONE, new_ast_label(1)),
+			strdup(filename), @1.first_line);
+
+		if ($$->sym == NULL) {
+			$$->sym = sym;
+		} else {
+			list_start($$->sym)->prev = sym;
+		}
+	}
+|	compound_statement	{
+		ast_sym_t *labels, *prev, *curr, *next;
+
+		curr = $1->sym;
+		labels = NULL;
+		next = NULL;
+		
+		// takes label symbols out of symbol list
+		while (curr != NULL) {
+			prev = curr->prev;
+			if (curr->sym_type == SYM_LABEL) {
+				if (next == NULL) {
+					$1->sym = curr->prev;
+				} else {
+					next->prev = curr->prev;
+				}
+
+				curr->prev = NULL;
+				if (labels == NULL) {
+					labels = curr;
+				} else {
+					list_start(labels)->prev = curr;
+				}
+			} else {
+				next = curr;
+			}
+			curr = prev;
+		}
+
+		// need to remove labels from here
 		insert_list(tab, $1->sym, SCO_BLOCK, @1.last_line, 1);
-		$$ = new_ast_stmt(new_ast_block($1), STMT_BLOCK, NULL);
+		$1->sym = labels;
+		$$ = new_ast_cpst(new_ast_stmt(new_ast_block($1), STMT_BLOCK, NULL), labels);
 	}
-|	term_expr ';' {
-		$$ = new_ast_stmt(new_ast_expr($1), STMT_EXPR, NULL);
-	}
+;
+
+term_expr_opt:
+	%empty	{$$ = NULL;}
+|	term_expr	{$$ = $1;}
 ;
 
 declaration:

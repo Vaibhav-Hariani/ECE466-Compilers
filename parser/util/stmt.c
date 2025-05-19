@@ -16,21 +16,21 @@ union ast_st *new_ast_block(ast_cpst_t *cpst) {
     return st;
 }
 
-union ast_st *new_ast_if(ast_node *cond, ast_cpst_t *icpst, ast_cpst_t *ecpst) {
+union ast_st *new_ast_if(ast_node *cond, ast_stmt_t *istmt, ast_stmt_t *estmt) {
     struct ast_if *ifst;
     union ast_st *st;
 
     ifst = calloc(1, sizeof (struct ast_if));
     ifst->cond = cond;
-    ifst->icpst = icpst;
-    ifst->ecpst = ecpst;
+    ifst->istmt = istmt;
+    ifst->estmt = estmt;
 
     st = calloc(1, sizeof(union ast_st));
     st->ifst = ifst;
     return st;
 }
 
-union ast_st *new_ast_for(ast_node *init, ast_node *cond, ast_node *adv, ast_cpst_t *cpst) {
+union ast_st *new_ast_for(ast_node *init, ast_node *cond, ast_node *adv, ast_stmt_t *stmt) {
     struct ast_for *forst;
     union ast_st *st;
 
@@ -38,49 +38,63 @@ union ast_st *new_ast_for(ast_node *init, ast_node *cond, ast_node *adv, ast_cps
     forst->init = init;
     forst->cond = cond;
     forst->adv = adv;
-    forst->cpst = cpst;
+    forst->stmt = stmt;
 
     st = calloc(1, sizeof(union ast_st));
     st->forst = forst;
     return st;
 }
 
-union ast_st *new_ast_while(ast_node *cond, ast_cpst_t *cpst) {
+union ast_st *new_ast_while(ast_node *cond, ast_stmt_t *stmt) {
     struct ast_while *whilst;
     union ast_st *st;
 
     whilst = calloc(1, sizeof (struct ast_while));
     whilst->cond = cond;
-    whilst->cpst = cpst;
+    whilst->stmt = stmt;
 
     st = calloc(1, sizeof(union ast_st));
     st->whilst = whilst;
     return st;
 }
 
-union ast_st *new_ast_dowhile(ast_node *cond, ast_cpst_t *cpst) {
+union ast_st *new_ast_dowhile(ast_node *cond, ast_stmt_t *stmt) {
     struct ast_dowhile *dowhilst;
     union ast_st *st;
 
     dowhilst = calloc(1, sizeof (struct ast_dowhile));
     dowhilst->cond = cond;
-    dowhilst->cpst = cpst;
+    dowhilst->stmt = stmt;
 
     st = calloc(1, sizeof(union ast_st));
     st->dowhilst = dowhilst;
     return st;
 }
 
-union ast_st *new_ast_switch(ast_node *cond, ast_cpst_t *cpst) {
+union ast_st *new_ast_switch(ast_node *cond, ast_stmt_t *stmt) {
     struct ast_switch *switchst;
     union ast_st *st;
 
     switchst = calloc(1, sizeof (struct ast_switch));
     switchst->cond = cond;
-    switchst->cpst = cpst;
+    switchst->stmt = stmt;
 
     st = calloc(1, sizeof(union ast_st));
     st->switchst = switchst;
+    return st;
+}
+
+union ast_st *new_ast_labelst(char label_type, ast_node *label, ast_stmt_t *stmt) {
+    struct ast_labelst *labelst;
+    union ast_st *st;
+
+    labelst = calloc(1, sizeof (struct ast_labelst));
+    labelst->label_type = label_type;
+    labelst->label = label;
+    labelst->stmt = stmt;
+
+    st = calloc(1, sizeof(union ast_st));
+    st->labelst = labelst;
     return st;
 }
 
@@ -113,8 +127,6 @@ ast_stmt_t *new_ast_stmt(union ast_st *st, char stmt_type, ast_stmt_t *next) {
 
     stmt = calloc(1, sizeof(ast_stmt_t));
     stmt->next = next;
-    stmt->label_type = LABEL_NONE;
-    stmt->label = NULL;
 
     stmt->stmt_type = stmt_type;
     stmt->st = st;

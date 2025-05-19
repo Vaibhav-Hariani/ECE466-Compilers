@@ -18,7 +18,7 @@ enum stmt_type {
     STMT_SWITCH,
     STMT_CASE,
     STMT_DEFAULT,
-    STMT_LABELLED,
+    STMT_LABELST,
     STMT_GOTO,
     STMT_RETURN
 };
@@ -37,30 +37,36 @@ typedef struct ast_stmt ast_stmt_t;
 
 struct ast_if {
     ast_node *cond;
-    ast_cpst_t *icpst;
-    ast_cpst_t *ecpst;
+    ast_stmt_t *istmt;
+    ast_stmt_t *estmt;
 };
 
 struct ast_for {
     ast_node *init;
     ast_node *cond;
     ast_node *adv;
-    ast_cpst_t *cpst;
+    ast_stmt_t *stmt;
 };
 
 struct ast_while {
     ast_node *cond;
-    ast_cpst_t *cpst;
+    ast_stmt_t *stmt;
 };
 
 struct ast_dowhile {
     ast_node *cond;
-    ast_cpst_t *cpst;
+    ast_stmt_t *stmt;
 };
 
 struct ast_switch {
     ast_node *cond;
-    ast_cpst_t *cpst;
+    ast_stmt_t *stmt;
+};
+
+struct ast_labelst {
+    char label_type;
+    ast_node *label;
+    ast_stmt_t *stmt;
 };
 
 struct ast_goto {
@@ -79,14 +85,13 @@ union ast_st {
     struct ast_while *whilst;
     struct ast_dowhile *dowhilst;
     struct ast_switch *switchst;
+    struct ast_labelst *labelst;
     struct ast_goto *gotost;
     struct ast_ret *ret;
 };
 
 typedef struct ast_stmt {
     ast_stmt_t *next;
-    char label_type;
-    ast_node *label;
 
     union ast_st *st;
     int stmt_type;
@@ -99,11 +104,12 @@ typedef struct ast_cpst {
 
 union ast_st *new_ast_expr(ast_node *expr);
 union ast_st *new_ast_block(ast_cpst_t *cpst);
-union ast_st *new_ast_if(ast_node *cond, ast_cpst_t *icpst, ast_cpst_t *ecpst);
-union ast_st *new_ast_for(ast_node *init, ast_node *cond, ast_node *adv, ast_cpst_t *cpst);
-union ast_st *new_ast_while(ast_node *cond, ast_cpst_t *cpst);
-union ast_st *new_ast_dowhile(ast_node *cond, ast_cpst_t *cpst);
-union ast_st *new_ast_switch(ast_node *cond, ast_cpst_t *cpst);
+union ast_st *new_ast_if(ast_node *cond, ast_stmt_t *istmt, ast_stmt_t *estmt);
+union ast_st *new_ast_for(ast_node *init, ast_node *cond, ast_node *adv, ast_stmt_t *stmt);
+union ast_st *new_ast_while(ast_node *cond, ast_stmt_t *stmt);
+union ast_st *new_ast_dowhile(ast_node *cond, ast_stmt_t *stmt);
+union ast_st *new_ast_switch(ast_node *cond, ast_stmt_t *stmt);
+union ast_st *new_ast_labelst(char label_type, ast_node *label, ast_stmt_t *stmt);
 union ast_st *new_ast_goto(char *label);
 union ast_st *new_ast_ret(ast_node *value);
 
