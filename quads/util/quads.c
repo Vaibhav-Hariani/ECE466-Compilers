@@ -78,16 +78,48 @@ struct gen_node_t* append(struct quad_ll* ref, struct quad_ll* new) {
 
 // Structured like this for more of an API interface
 // Underlying data structue changed a lot during development
-void append_quad(big_block* ref, quad* new) {
+void append_quad(struct quad_ll* ref, quad* new) {
   struct ll_nodes* ll_node = calloc(1, sizeof(struct ll_nodes));
-  ll_node->cur = new;
-  if (ref->quads_list.head == NULL) {
-    ref->quads_list.head = ll_node;
-    ref->quads_list.tail = ref->quads_list.head;
+  if (ref->head == NULL) {
+    ref->head = ll_node;
+    ref->tail = ll_node;
   } else {
-    ref->quads_list.tail->next = ll_node;
-    ref->quads_list.tail = ll_node;
+    ref->tail->next = ll_node;
+    ref->tail = ll_node;
   }
+}
+
+// Each big block gets inserted into the CFG
+//  On a branch statement, you do a BREQ or
+void create_CFG_tree(big_block* root, ast_node* cond) {}
+
+
+//funct_decl isn't a real object
+//If it existed, it would be the root of the ast, with a list of  
+struct CFG* create_funct(struct funct_decl* func, int func_count) {
+  struct CFG* cfg_root = calloc(0, sizeof(struct CFG));
+  big_block* head = new_block();
+  head->func_label = func->func_name;
+  head->func_ind = func_count;
+  head->block_ind = 0;
+  cfg_root->block = head;
+  //Using this as a wrapper for whatever statements I get from the AST
+  struct list_node* list = func->exprs_or_stmts; 
+  while (list->next != NULL) {
+    if (list->cur->type < AST_funct) {
+      int tmp_ctr = 0;
+      descend_expr_ast(list->cur,&(head->quads_list), &tmp_ctr);
+
+    } else if (list->cur->type >= AST_STMT) {
+
+      
+    }
+
+    // quads = descend_ast(list->cur,)
+
+  list = list->next;
+  }
+
 }
 
 // 3 aspects to a loop
@@ -141,33 +173,14 @@ struct gen_node_t* get_element(ast_node* node, struct quad_ll* list,
 
 int parse_assign_q_code(int parser_code) { return parser_code - Q_ADD; };
 
-// struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr) {
-//   // if type is a statement, descend AST_STMT
-//   // Should always be the case on the very first node
-
-//   // For testing, always descend as though it's an expression
-//   if (node->type < 200) {
-//     return descend_expr_ast(node, tmp_ctr);
-
-//     // big_block* ret = descend_stmt_ast(node, tmp_ctr, block_ctr, parent);
-//     // (*block_ctr)++;
-//     return ret;
-//   }
-// }
-
-struct big_block* descend_stmt_ast(ast_node* node, int* tmp_ctr, int* block_ctr,
-                                   big_block* parent) {
-  // If it's a statement that inits a new block (conditions, loops, functs),
-  // increment block ctr
-
-  big_block* ret = new_block();
-  ret->block_ind = *block_ctr;
-  struct gen_node_t* n1;
-  struct gen_node_t* n2;
-  return ret;
-  // On statement type
-  // If it's a
-  // switch(node.op)
+// Statement that inits a new block (conditions, loops, functs),
+struct quad_ll* control_flow(ast_node* node, int* tmp_ctr, int* block_ctr,
+                                 big_block* current) {
+  // Only supporting while loops
+  if (node->type == AST_LOOP) {
+    big_block* cond_block = create_loop();
+    
+  }
 }
 
 struct gen_node_t* get_ptr_el(ast_node* node, big_block* ret, int* tmp_ctr) {
@@ -285,9 +298,6 @@ struct quad_ll* descend_expr_ast(ast_node* node, struct quad_ll* list,
           append_quad(list, final_quad);
         }
       }
-      // TODO:
-      // Handling pointer addition: this should be replaced with a function
-      // table lookup
     case (AST_funct):
       struct funct* funct_el = node->obj.f;
 
@@ -313,8 +323,6 @@ struct quad_ll* descend_expr_ast(ast_node* node, struct quad_ll* list,
       append_quad(list, func_call_quad);
       break;
 
-      // Unops don't evaluate to quads, they should evaluate to
-
     case (AST_unop):
       struct unop* unop_el = node->obj.u;
       n1 = get_element(unop_el->expr, list, tmp_ctr);
@@ -335,14 +343,14 @@ struct quad_ll* descend_expr_ast(ast_node* node, struct quad_ll* list,
           //  struct gen_node_t* val = new_const(n1.size);
           final_quad = quad_gen(n2, n1, NULL, Q_MOV);
           break;
-        case PLUSPLUS:
-          n2 = new_const(1);
-          final_quad = quad_gen(n1, n1, n2, Q_ADD);
-          break;
-        case MINUSMINUS:
-          n2 = new_const(1);
-          final_quad = quad_gen(n1, n1, n2, Q_SUB);
-          break;
+          // case PLUSPLUS:
+          //   n2 = new_const(1);
+          //   final_quad = quad_gen(n1, n1, n2, Q_ADD);
+          //   break;
+          // case MINUSMINUS:
+          //   n2 = new_const(1);
+          //   final_quad = quad_gen(n1, n1, n2, Q_SUB);
+          //   break;
       }
       append_quad(list, final_quad);
   }

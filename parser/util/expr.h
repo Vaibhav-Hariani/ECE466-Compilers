@@ -14,6 +14,7 @@ enum node_type {
     AST_string,
     AST_charlit,
     AST_num,
+    AST_STMT,
 };
 
 struct ast_node typedef ast_node;

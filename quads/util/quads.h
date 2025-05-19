@@ -120,10 +120,17 @@ struct big_block {
 // A linked list of
 struct CFG {
   big_block* block;
-  big_block* true_exit;
-  big_block* false_exit;
-  //
-  bool term_block;
+  struct CFG* true_exit;
+  struct CFG* false_exit;
+  //bool term block?
+};
+
+//As I don't have the symbol table to rely on, I'm doing this myself
+//This is just an API reference, actual implementation would be in the parser
+
+struct funct_decl {
+  char* func_name;
+  struct list_node* exprs_or_stmts;
 };
 
 // API
