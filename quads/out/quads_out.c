@@ -34,6 +34,8 @@ void print_quad_block(big_block* block) {
   printf("\n");
 }
 
+
+
 void gen_node_str(struct gen_node_t* node) {
   if(node == 0){
     return;
