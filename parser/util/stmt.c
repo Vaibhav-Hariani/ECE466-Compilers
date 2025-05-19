@@ -71,12 +71,52 @@ union ast_st *new_ast_dowhile(ast_node *cond, ast_cpst_t *cpst) {
     return st;
 }
 
+union ast_st *new_ast_switch(ast_node *cond, ast_cpst_t *cpst) {
+    struct ast_switch *switchst;
+    union ast_st *st;
+
+    switchst = calloc(1, sizeof (struct ast_switch));
+    switchst->cond = cond;
+    switchst->cpst = cpst;
+
+    st = calloc(1, sizeof(union ast_st));
+    st->switchst = switchst;
+    return st;
+}
+
+union ast_st *new_ast_goto(char *label) {
+    struct ast_goto *gotost;
+    union ast_st *st;
+
+    gotost = calloc(1, sizeof (struct ast_goto));
+    gotost->label = label;
+    
+    st = calloc(1, sizeof(union ast_st));
+    st->gotost = gotost;
+    return st;
+}
+
+union ast_st *new_ast_ret(ast_node *value) {
+    struct ast_ret *ret;
+    union ast_st *st;
+
+    ret = calloc(1, sizeof (struct ast_ret));
+    ret->value = value;
+    
+    st = calloc(1, sizeof(union ast_st));
+    st->ret = ret;
+    return st;
+}
+
 ast_stmt_t *new_ast_stmt(union ast_st *st, char stmt_type, ast_stmt_t *next) {
     ast_stmt_t *stmt;
 
     stmt = calloc(1, sizeof(ast_stmt_t));
-    stmt->stmt_type = stmt_type;
     stmt->next = next;
+    stmt->label_type = LABEL_NONE;
+    stmt->label = NULL;
+
+    stmt->stmt_type = stmt_type;
     stmt->st = st;
     return stmt;
 }
@@ -92,13 +132,12 @@ ast_cpst_t *new_ast_cpst(ast_stmt_t *stmt, ast_sym_t *sym) {
 
 ast_stmt_t *append_stmt(ast_stmt_t *stmt, ast_stmt_t *new) {
     ast_stmt_t *temp;
-    
-    temp = stmt;
-    if (temp == NULL) {
-        stmt = new;
-        return stmt;
+
+    if (stmt == NULL) {
+        return new;
     }
     
+    temp = stmt;
     while (temp->next != NULL) {
         temp = temp->next;
     }

@@ -20,7 +20,11 @@ static const struct doesnt_exist *jangler;
 
 int myFunc(int a, char, char *string);
 int myFunc(int i, char c, char *s) {
-    int new_i;
+    int new_i, new_c;
+    c = 'a';
+    {
+        new_i = (c > 'A')? 0 : 1;
+    }
     char *const string;
 }
 
