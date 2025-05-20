@@ -69,8 +69,59 @@ void print_stmt(ast_stmt_t *stmt, int num_spaces) {
             printf("BODY:\n");
             print_stmt(stmt->st->switchst->stmt, num_spaces + 1);
             break;
+        case STMT_CONTINUE:
+            print_spaces(num_spaces);
+            printf("CONTINUE\n");
+            break;
+        case STMT_BREAK:
+            print_spaces(num_spaces);
+            printf("BREAK\n");
+            break;
+        case STMT_CASE:
+            print_spaces(num_spaces);
+            printf("CASE:\n");
+            print_spaces(num_spaces + 1);
+            printf("COND:\n");
+            print_ast(stmt->st->labelst->label, num_spaces + 2);
+            print_spaces(num_spaces + 1);
+            printf("BODY:\n");
+            print_stmt(stmt->st->labelst->stmt, num_spaces + 2);
+            break;
+        case STMT_DEFAULT:
+            print_spaces(num_spaces);
+            printf("DEFAULT:\n");
+            print_spaces(num_spaces + 1);
+            printf("BODY:\n");
+            print_stmt(stmt->st->labelst->stmt, num_spaces + 2);
+            break;
+        case STMT_LABELST:
+            print_spaces(num_spaces);
+            printf("LABELLED:\n");
+            print_spaces(num_spaces + 1);
+            printf("LABEL:\n");
+            print_ast(stmt->st->labelst->label, num_spaces + 2);
+            print_spaces(num_spaces + 1);
+            printf("BODY:\n");
+            print_stmt(stmt->st->labelst->stmt, num_spaces + 2);
+            break;
+            break;
+        case STMT_GOTO:
+            print_spaces(num_spaces);
+            printf("GOTO\n");
+            print_spaces(num_spaces + 1);
+            printf("LABEL:\n");
+            print_spaces(num_spaces + 2);
+            printf("%s\n", stmt->st->gotost->label);
+            break;
+        case STMT_RETURN:
+            print_spaces(num_spaces);
+            printf("RETURN:\n");
+            print_spaces(num_spaces + 1);
+            printf("VALUE:\n");
+            print_ast(stmt->st->ret->value, num_spaces + 2);
+            break;
         case SYM_UNIO_T:
-            printf("i think you're lost\n");
+            fprintf(stderr, "i think you're lost\n");
             break;
     }
     printf("\n");

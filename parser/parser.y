@@ -266,7 +266,7 @@ statement:
 			new_ast_stmt(new_ast_while($3, $5->stmt), STMT_WHILE, NULL),
 			NULL);
 	}
-|	DO statement WHILE '(' term_expr ')'	{
+|	DO statement WHILE '(' term_expr ')' ';'	{
 		$$ = new_ast_cpst(
 			new_ast_stmt(new_ast_dowhile($5, $2->stmt), STMT_DOWHILE, NULL),
 			NULL);
