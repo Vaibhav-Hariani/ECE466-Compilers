@@ -8,11 +8,14 @@ void print_quad(quad* q) {
   //puts dest onto the current output file
   printf("  ");
 
-  gen_node_str(q->destination);
   //puts dest onto the current output file
-  printf("= %s ", code_str);
-  gen_node_str(q->src1);
+  if(q->destination != 0) {
+  gen_node_str(q->destination);
+  printf("=");
+  }
+  printf("%s ", code_str);
 
+  gen_node_str(q->src1);
   //puts dest onto the current output file
   gen_node_str(q->src2);
   // printf("\t %s", code_str);
@@ -24,7 +27,7 @@ void print_quad_block(big_block* block) {
   if (block->func_label) {
     printf("%s: \n", block->func_label);
   }
-  printf(" BB%d:", block->block_ind);
+  printf(" BB%d.%d:", block->func_ind, block->block_ind);
   struct ll_nodes* head = block->quads_list.head;
   while (head != NULL) {
     printf("\n");

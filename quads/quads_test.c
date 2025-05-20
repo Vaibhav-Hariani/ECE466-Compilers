@@ -10,8 +10,8 @@ int main(){
     n.type = TYPE_I;
     n.val.i = 5;
     ast_node* node_n = new_ast_num(n, "stdin",2);
-    ast_node* binop = new_ast_double(AST_binop, a, node_n, '*', "stdin", 3);
-    ast_node* assign = new_ast_double(AST_assign, b, binop, '=', "stdin", 4);
+    // ast_node* binop = new_ast_double(AST_binop, a, node_n, '*', "stdin", 3);
+    ast_node* assign = new_ast_double(AST_assign, a, node_n, '=', "stdin", 4);
     int tmp_ctr = 0;
     int block_ctr = 0;
     big_block* block = new_block();

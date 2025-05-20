@@ -1101,7 +1101,6 @@ void yyerror(const char *format, ...){
     vfprintf(stderr, format, args);
 	va_end(args);
 }
-
 int main(int argc, char** argv){
     FILE *file;
     if(argc < 2) {

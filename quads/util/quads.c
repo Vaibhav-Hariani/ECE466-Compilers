@@ -13,12 +13,12 @@ big_block* new_block() {
 
 
 ast_sym_t* promotion(struct gen_node_t* r1, struct gen_node_t* r2) {
-  if (r2->symbol->data->data_type == DATA_PTR &&
-      r1->symbol->data->data_type == SCAL_INT) {
-    return r2->symbol;
-    // Can add a much more involved cmp_val thing here
-    // Type checking
-  }
+  // if (r2->symbol->data->data_type == DATA_PTR &&
+  //     r1->symbol->data->data_type == SCAL_INT) {
+  //   return r2->symbol;
+  //   // Can add a much more involved cmp_val thing here
+  //   // Type checking
+  // }
   return r1->symbol;
 }
 
@@ -182,7 +182,7 @@ struct gen_node_t* get_element(ast_node* node, struct quad_ll* list,
       ret->symbol =
           get_sym(table, node->obj.ident, NS_MISC, node->line, node->line);
     }
-    return new_var(node->obj.ident);
+    return ret;
   }
   if (node->type == AST_num) {
     return new_const(node->obj.num.val.i);
@@ -238,9 +238,10 @@ struct quad_ll* descend_expr_ast(ast_node* node, struct quad_ll* list,
         append_quad(list, tmp_q);
       }
       // Check if lval is a pointer or not
-      if (n1->type == VAR) {
-        quad* final_quad = list->tail->cur;
-        final_quad->destination = n1;
+      //If it's a var, we do some funky funky stuff to get values out without appending a quad
+      if (n1->type == VAR && n2->type == TMP) {
+          final_quad = list->tail->cur;
+          final_quad->destination = n1;
       } else {
         quad* final_q = quad_gen(NULL, n1, n2, Q_STORE);
         append_quad(list, final_q);
