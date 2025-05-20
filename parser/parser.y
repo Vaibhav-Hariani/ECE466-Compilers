@@ -194,7 +194,7 @@ function_def: /*does not support k&r style*/
 					@3.last_line, 1);	// insert params
 				insert_list(tab, $3->sym, SCO_FUNC,
 					@3.last_line, 1);	// insert compound statement
-				print_stmt_list($3->stmt);
+				print_stmt_list($3->stmt, 0, $2->name);
 				$$ = $2;
 			} else {
 				del_sym_list($3->sym);
@@ -258,7 +258,7 @@ statement:
 	}
 |	FOR '(' term_expr_opt ';' term_expr_opt ';' term_expr_opt ')' statement	{
 		$$ = new_ast_cpst(
-			new_ast_stmt(new_ast_for($3, $5, $7, $9->stmt), STMT_IF, NULL),
+			new_ast_stmt(new_ast_for($3, $5, $7, $9->stmt), STMT_FOR, NULL),
 			NULL);
 	}
 |	WHILE '(' term_expr ')' statement	{

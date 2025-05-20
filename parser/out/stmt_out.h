@@ -11,8 +11,8 @@ typedef struct ast_sym ast_sym_t;
 typedef struct ast_cpst ast_cpst_t;
 typedef struct ast_stmt ast_stmt_t;
 
-void print_stmt(ast_stmt_t *stmt);
+void print_stmt(ast_stmt_t *stmt, int num_spaces);
 
-void print_stmt_list(ast_stmt_t *stmt);
+void print_stmt_list(ast_stmt_t *stmt, int num_spaces, char *name);
 
 #endif // STMT_OUT_H

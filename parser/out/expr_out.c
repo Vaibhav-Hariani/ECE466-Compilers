@@ -86,39 +86,41 @@ char** token_labels() {
   return tokens;
 }
 
+void print_spaces(int num_spaces) {
+    char tab_arr[num_spaces + 1];
+    memset(tab_arr, ' ', num_spaces);
+    tab_arr[num_spaces] = '\0';
+    printf("%s", tab_arr);
+}
+
 // Helper function to print an int
 void print_num(TypedNumber num) {
   if (num.type <= TYPE_ULLI) {
-    fprintf(stderr, "NUMLIT INT: %lld \n", num.val.i);
+    printf("NUMLIT INT: %lld \n", num.val.i);
   } else {
-    fprintf(stderr, "NUMLIT FLOAT: %Lg \n", num.val.f);
+    printf("NUMLIT FLOAT: %Lg \n", num.val.f);
   }
 };
 
 void opcode_print(int opcode, char** tokens, char* pre_msg, char* post_msg){
-  fprintf(stderr, "%s", pre_msg);
+  printf("%s", pre_msg);
   if (opcode <= 255) {
-    fprintf(stderr, "%c %s \n", opcode, post_msg);
+    printf("%c %s \n", opcode, post_msg);
   } else {
-    fprintf(stderr, "%s %s \n", tokens[opcode], post_msg);
+    printf("%s %s \n", tokens[opcode], post_msg);
   }
 
 }
 
-ast_node* print_ast(ast_node* expr) {
+ast_node* print_ast(ast_node* expr, int num_spaces) {
   char** tokens = token_labels();
-  print_recurse(expr, 0, tokens);
+  print_recurse(expr, num_spaces, tokens);
   return expr;
 }
 
 
-void print_recurse(ast_node* expr, int num_tabs, char** tokens) {
-  char tab_arr[num_tabs + 1];
+void print_recurse(ast_node* expr, int num_spaces, char** tokens) {
   char* c;
-
-  memset(tab_arr, '\t', num_tabs);
-  tab_arr[num_tabs] = '\0';
-  fprintf(stderr, "%s", tab_arr);
 
   int opcode;
   switch (expr->type) {
@@ -127,26 +129,32 @@ void print_recurse(ast_node* expr, int num_tabs, char** tokens) {
       struct binop* b = expr->obj.b;
       opcode = b->opcode;
 
+      print_spaces(num_spaces);
       opcode_print(opcode, tokens, "BINARY OP ", "");
 
-      print_recurse(b->expr_1, num_tabs + 1, tokens);
+      print_recurse(b->expr_1, num_spaces + 1, tokens);
 
-      print_recurse(b->expr_2, num_tabs + 1, tokens);
+      print_recurse(b->expr_2, num_spaces + 1, tokens);
       /* code */
       break;
 
     case AST_ternop:;
       struct ternop* t = expr->obj.t;
-      fprintf(stderr, "TERNARY: \n");
 
-      fprintf(stderr, "%s EXPR 1: \n", tab_arr);
-      print_recurse(t->expr_1, num_tabs + 1, tokens);
+      print_spaces(num_spaces);
+      printf("TERNARY: \n");
 
-      fprintf(stderr, "%s EXPR 2: \n", tab_arr);\
-      print_recurse(t->expr_2, num_tabs + 1, tokens);
+      print_spaces(num_spaces + 1);
+      printf("EXPR 1:\n");
+      print_recurse(t->expr_1, num_spaces + 2, tokens);
 
-      fprintf(stderr, "%s EXPR 3: \n", tab_arr);
-      print_recurse(t->expr_3, num_tabs + 1, tokens);
+      print_spaces(num_spaces + 1);
+      printf("EXPR 2:\n");
+      print_recurse(t->expr_2, num_spaces + 2, tokens);
+
+      print_spaces(num_spaces + 1);
+      printf("EXPR 3:\n");
+      print_recurse(t->expr_3, num_spaces + 2, tokens);
 
       break;
 
@@ -155,9 +163,10 @@ void print_recurse(ast_node* expr, int num_tabs, char** tokens) {
       char* pre_post = (u->sequence == PREFIX) ? "PREFIX" : "POSTFIX";
       opcode = u->opcode;
 
+      print_spaces(num_spaces);
       opcode_print(opcode, tokens, "UNARY OP ", pre_post);
 
-      print_recurse(u->expr, num_tabs + 1, tokens);
+      print_recurse(u->expr, num_spaces + 1, tokens);
 
       break;
 
@@ -165,27 +174,33 @@ void print_recurse(ast_node* expr, int num_tabs, char** tokens) {
       struct assign* a = expr->obj.a;
       opcode = a->opcode;
 
+      print_spaces(num_spaces);
       opcode_print(opcode, tokens, "ASSIGNMENT ", "");
 
-      fprintf(stderr, "%s LVAL: \n", tab_arr);
-      print_recurse(a->lvalue, num_tabs + 1, tokens);
+      print_spaces(num_spaces + 1);
+      printf("LVAL:\n");
+      print_recurse(a->lvalue, num_spaces + 2, tokens);
 
-      fprintf(stderr, "%s RVAL: \n", tab_arr);
-      print_recurse(a->rvalue, num_tabs + 1, tokens);
+      print_spaces(num_spaces + 1);
+      printf("RVAL:\n");
+      print_recurse(a->rvalue, num_spaces + 2, tokens);
       break;
     
     case AST_funct:;
       struct funct* f = expr->obj.f;
-      fprintf(stderr, "FUNCTION CALL \n");
+      print_spaces(num_spaces);
+      printf("FUNCTION CALL:\n");
 
-      fprintf(stderr, "%s FUNCTION \n", tab_arr);
-      print_recurse(f->name, num_tabs+1,tokens);
+      print_spaces(num_spaces + 1);
+      printf("FUNCTION:\n");
+      print_recurse(f->name, num_spaces + 2, tokens);
 
-      fprintf(stderr, "%s ARGS \n", tab_arr);
+      print_spaces(num_spaces + 1);
+      printf("ARGS:\n");
 
       struct list_node args = *(f->args);
       while(args.cur != 0) {
-        print_recurse(args.cur,num_tabs+1, tokens);
+        print_recurse(args.cur,num_spaces + 2, tokens);
         if(args.next != 0){
           args=*(args.next);
         } else{
@@ -197,30 +212,34 @@ void print_recurse(ast_node* expr, int num_tabs, char** tokens) {
 
     case AST_ident:
       c = expr->obj.ident;
-      fprintf(stderr, "IDENT: %s \n", c);
+      print_spaces(num_spaces);
+      printf("IDENT: %s\n", c);
       break;
 
     case AST_string:
       SizedString str = expr->obj.str;
-      fprintf(stderr, "STRINGLIT:");
+      print_spaces(num_spaces);
+      printf("STRINGLIT: ");
       for(int i = 0; i < str.size; i++){
-        putc(str.li[i], stderr);
+        putc(str.li[i], stdout);
       }
-      putc('\n', stderr);
+      putc('\n', stdout);
       break;
 
     case AST_charlit:;
       char lit = expr->obj.charlit;
-      fprintf(stderr, "CHARLIT: %c: \n", lit);
+      print_spaces(num_spaces);
+      printf("CHARLIT: %c\n", lit);
       break;
 
     case AST_num:;
       TypedNumber n = expr->obj.num;
+      print_spaces(num_spaces);
       print_num(n);
       break;
 
     default:
-      fprintf(stderr, "Unkown Expression Type: Failed \n");
+      fprintf(stderr, "Unkown Expression Type: Failed\n");
       exit(1);
       break;
   }
