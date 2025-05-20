@@ -1,4 +1,5 @@
 #include "quads_out.h"
+
 void print_quad(quad* q) {
   char* code_str = qcode_str_conv(q->op);
   // char* dest = gen_node_str(q->destination);

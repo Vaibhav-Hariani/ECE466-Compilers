@@ -5,10 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include "yylval.h"
 #include "data.h"
 #include "table.h"
-#include "../parser.tab.h"
 
 typedef struct ast_data ast_data_t;
 typedef struct ast_tab ast_tab_t;

@@ -1,4 +1,5 @@
 #include "data.h"
+#include "../parser.tab.h"
 
 union ast_type *new_ast_scal(char unsign, char scal_type){
     struct ast_scal *scal;

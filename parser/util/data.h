@@ -2,8 +2,7 @@
 #define DATA_H
 
 #include "symbol.h"
-#include "../parser.tab.h"
-
+#include "yylval.h"
 typedef struct ast_sym ast_sym_t;
 
 enum data_type {

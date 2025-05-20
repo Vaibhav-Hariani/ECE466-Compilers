@@ -1,4 +1,6 @@
 #include "table.h"
+#include "../out/symtab_out.h"
+#include "../parser.tab.h"
 
 int get_namespace(short sym_type) {
     switch (sym_type) {

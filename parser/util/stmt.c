@@ -1,4 +1,6 @@
 #include "stmt.h"
+#include "../parser.tab.h"
+#include "yylval.h"
 
 union ast_st *new_ast_expr(ast_node *expr) {
     union ast_st *st;

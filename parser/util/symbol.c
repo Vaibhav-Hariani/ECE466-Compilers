@@ -1,4 +1,6 @@
 #include "symbol.h"
+#include "yylval.h"
+#include "../parser.tab.h"
 
 ast_sym_t *new_ast_sym(char *name, char stg_type, short sym_type,
         ast_data_t *data, char *filename, int start){

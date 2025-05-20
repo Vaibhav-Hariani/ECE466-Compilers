@@ -3,8 +3,6 @@
 
 #include "symbol.h"
 #include "data.h"
-#include "../out/symtab_out.h"
-#include "../parser.tab.h"
 
 typedef struct ast_sym ast_sym_t;
 typedef struct ast_data ast_data_t;

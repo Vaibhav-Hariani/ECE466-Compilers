@@ -2,9 +2,7 @@
 #define EXPR_H
 
 #include <stdlib.h>
-
 #include "yylval.h"
-#include "../parser.tab.h"
 
 enum node_type {
     AST_binop=0,

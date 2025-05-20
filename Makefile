@@ -33,13 +33,13 @@ bison_debug: parser/parser.y $(PARSER_UTIL_H) $(PARSER_OUT_H) $(QUADS_UTIL_H)
 # Rule to build the main parser executable
 # Depends on flex, bison, and relevant C source files.
 # Removed QUADS dependencies as they are not in the gcc link line for parser.out
-parser: flex bison $(PARSER_UTIL_C) $(PARSER_OUT_C)
+parser: flex bison $(PARSER_UTIL_C) $(PARSER_OUT_C) $(QUADS_UTIL_C)
 	gcc -o parser/parser.out $(CFLAGS) parser/parser.tab.c lexer/lex.yy.c $(PARSER_UTIL_C) $(PARSER_OUT_C)
 
 # Rule to build the debug version of the parser executable
 # Assumes parser_debug.out needs QUADS_UTIL_C but not QUADS_OUT_C
-debug_parser: flex bison_debug $(PARSER_UTIL_C) $(PARSER_OUT_C) $(QUADS_UTIL_C)
-	gcc -o parser/parser_debug.out $(CFLAGS) -g parser/parser.tab.c lexer/lex.yy.c $(PARSER_UTIL_C) $(PARSER_OUT_C) $(QUADS_UTIL_C)
+debug_parser: flex bison_debug $(PARSER_UTIL_C) $(PARSER_OUT_C) $(QUADS_UTIL_C) $(QUADS_OUT_C)
+	gcc -o parser/parser_debug.out $(CFLAGS) -g parser/parser.tab.c lexer/lex.yy.c $(PARSER_UTIL_C) $(PARSER_OUT_C) $(QUADS_UTIL_C)  $(QUADS_OUT_C)
 
 # Rule to build the quads test executable
 # Corrected: Removed explicit parser/util/expr.c from gcc command.

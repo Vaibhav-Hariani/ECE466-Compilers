@@ -1,5 +1,8 @@
 %{
      #include "parser.tab.h"
+	 #include "quads.h"
+	 #include "quads_out.h"
+
      int yylex(void);
      extern FILE *yyin;
 	 char *filename;
@@ -60,6 +63,7 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
     #include "out/expr_out.h"
     #include "out/stmt_out.h"
     #include "out/symtab_out.h"
+
     void yyerror(const char *format, ...);
 
 	typedef struct ast_node ast_node;
@@ -80,10 +84,13 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 
 %code {
 	ast_tab_t *tab;
+	int func_count;
 }
 
 %initial-action {
 	tab = new_table(0);
+	func_count = 0;
+
 };
 
 %define api.location.type {YYLTYPE}
@@ -188,13 +195,22 @@ function_def: /*does not support k&r style*/
 			$2->data->node->func->is_complete = 1;
 			install_tail($2, copy_ast_data($1->data, -1));
 			del_ast_sym($1);
-
 			if (!insert(tab, $2, SCO_FILE, __INT_MAX__, 1)) {	// insert function
 				insert_list(tab, $2->data->node->func->params, SCO_FUNC,
 					@3.last_line, 1);	// insert params
 				insert_list(tab, $3->sym, SCO_FUNC,
 					@3.last_line, 1);	// insert compound statement
 				print_stmt_list($3->stmt);
+
+				// Entrypoint for quad gen
+				// If control flow was to be done,
+				// This would be a CFG object, not a block
+				// CFGS would be appended to a list of CFGS
+				// And then they'd be traversed one by one
+				//My lack of time management meant no such solutions
+				big_block* quads = descend_funct($3,func_count, tab);
+				func_count++;
+				print_quad_block(quads);
 				$$ = $2;
 			} else {
 				del_sym_list($3->sym);
@@ -1086,7 +1102,7 @@ void yyerror(const char *format, ...){
 	va_end(args);
 }
 
-/* int main(int argc, char** argv){
+int main(int argc, char** argv){
     FILE *file;
     if(argc < 2) {
         yyin = stdin;
@@ -1107,6 +1123,6 @@ void yyerror(const char *format, ...){
         fclose(file);    
     }
 
-    return 0; */
+    return 0;
     /* yyparse();  */
-/* }  */
+} 

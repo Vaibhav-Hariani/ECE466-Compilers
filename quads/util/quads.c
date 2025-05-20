@@ -1,6 +1,5 @@
 #include "quads.h"
-
-
+#include "parser.tab.h"
 #define new_quad calloc(1, sizeof(struct quad))
 
 int ast_quad_op(int op);
@@ -12,11 +11,13 @@ big_block* new_block() {
   return new_block;
 }
 
+
 ast_sym_t* promotion(struct gen_node_t* r1, struct gen_node_t* r2) {
-  if (r2->symbol->data->data_type == DATA_PTR && r1->symbol->data->data_type == INT) {
+  if (r2->symbol->data->data_type == DATA_PTR &&
+      r1->symbol->data->data_type == SCAL_INT) {
     return r2->symbol;
     // Can add a much more involved cmp_val thing here
-    //Type checking
+    // Type checking
   }
   return r1->symbol;
 }
@@ -27,7 +28,7 @@ struct gen_node_t* new_tmp(int tmp_ctr, ast_sym_t* type) {
   node->type = TMP;
   struct tmp* data = calloc(1, sizeof(struct tmp));
   data->value = tmp_ctr;
-  node->symbol= type;
+  node->symbol = type;
   node->data.t = data;
   return node;
 }
@@ -74,7 +75,7 @@ struct gen_node_t* append(struct quad_ll* ref, struct quad_ll* new) {
 // Underlying data structue changed a lot during development
 void append_quad(struct quad_ll* ref, quad* new) {
   struct ll_nodes* ll_node = calloc(1, sizeof(struct ll_nodes));
-   ll_node->cur = new;
+  ll_node->cur = new;
   if (ref->head == NULL) {
     ref->head = ll_node;
     ref->tail = ll_node;
@@ -87,6 +88,27 @@ void append_quad(struct quad_ll* ref, quad* new) {
 // Each big block gets inserted into the CFG
 //  On a branch statement, you do a BREQ or
 void create_CFG_tree(big_block* root, ast_node* cond) {}
+
+struct big_block* descend_funct(struct ast_cpst* node, int func_count, struct ast_tab* table) {
+  int block_count = 0;
+  big_block* block = new_block();
+  block->block_ind = block_count;
+  block->func_ind = func_count;
+  ast_stmt_t* list = node->stmt;
+  while(list) {
+    int tmp_ctr = 0;
+    switch(list->stmt_type) {
+      case STMT_EXPR:
+        descend_expr_ast(list->st->expr, &(block->quads_list), &tmp_ctr, table);
+        break;
+      default:
+      printf("Unsupported Stmt Type: Coming Soon! \n");
+    }
+    //Iterate over the stmts
+    list = list->next;
+  }  
+  return block;
+}
 
 // funct_decl isn't a real object
 // If it existed, it would be the root of the ast, with a list of
@@ -156,8 +178,9 @@ struct gen_node_t* get_element(ast_node* node, struct quad_ll* list,
     // Replace this with a symtab lookup
 
     struct gen_node_t* ret = new_var(node->obj.ident);
-    if(table != NULL){
-      ret->symbol = get_sym(table, node->obj.ident, NS_MISC, node->line, node->line);
+    if (table != NULL) {
+      ret->symbol =
+          get_sym(table, node->obj.ident, NS_MISC, node->line, node->line);
     }
     return new_var(node->obj.ident);
   }
@@ -170,16 +193,6 @@ struct gen_node_t* get_element(ast_node* node, struct quad_ll* list,
 }
 
 int parse_assign_q_code(int parser_code) { return parser_code - Q_ADD; };
-
-// // Statement that inits a new block (conditions, loops, functs),
-// struct quad_ll* control_flow(ast_node* node, int* tmp_ctr, int* block_ctr,
-//                                  big_block* current) {
-//   // Only supporting while loops
-//   if (node->type == AST_LOOP) {
-//     big_block* cond_block = create_loop();
-
-//   }
-// }
 
 // Stat is -1 for incorrect lval, 0 for ident, 1 for pointer
 struct gen_node_t* get_lvalue(ast_node* node, struct quad_ll* list,
@@ -239,15 +252,15 @@ struct quad_ll* descend_expr_ast(ast_node* node, struct quad_ll* list,
       n1 = get_element(binop_el->expr_1, list, tmp_ctr, table);
       n2 = get_element(binop_el->expr_2, list, tmp_ctr, table);
       // Pointer arithmetic
-      if(n1->symbol == NULL || n2->symbol == NULL) {
-          struct gen_node_t* tmp = new_tmp(*tmp_ctr, n2->symbol);
-          (*tmp_ctr)++;
-          int op = ast_quad_op(binop_el->opcode);
-          final_quad = quad_gen(tmp, n1, n2, op);
-          append_quad(list, final_quad);
-      } else if (binop_el->opcode == '+' && (n1->symbol->data->data_type == DATA_PTR ||
-                                      n2->symbol->data->data_type == DATA_PTR)) {
-                                        
+      if (n1->symbol == NULL || n2->symbol == NULL) {
+        struct gen_node_t* tmp = new_tmp(*tmp_ctr, n2->symbol);
+        (*tmp_ctr)++;
+        int op = ast_quad_op(binop_el->opcode);
+        final_quad = quad_gen(tmp, n1, n2, op);
+        append_quad(list, final_quad);
+      } else if (binop_el->opcode == '+' &&
+                 (n1->symbol->data->data_type == DATA_PTR ||
+                  n2->symbol->data->data_type == DATA_PTR)) {
         struct gen_node_t* ptr;
         struct gen_node_t* offset;
         int size = 0;
@@ -272,7 +285,8 @@ struct quad_ll* descend_expr_ast(ast_node* node, struct quad_ll* list,
         append_quad(list, inter);
 
       } else if (binop_el->opcode == '-' &&
-                 (n1->symbol->data->data_type == DATA_PTR && n2->symbol->data->data_type == DATA_PTR)) {
+                 (n1->symbol->data->data_type == DATA_PTR &&
+                  n2->symbol->data->data_type == DATA_PTR)) {
         struct gen_node_t* size = new_const(n1->symbol->data->size);
         struct gen_node_t* tmp1 = new_tmp(*tmp_ctr, n1->symbol);
         (*tmp_ctr)++;

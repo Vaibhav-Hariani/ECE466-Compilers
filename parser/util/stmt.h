@@ -1,10 +1,8 @@
 #ifndef STMT_H
 #define STMT_H
 
-#include "yylval.h"
 #include "expr.h"
 #include "symbol.h"
-#include "../parser.tab.h"
 
 enum stmt_type {
     STMT_EXPR = 0, //

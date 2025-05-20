@@ -2,14 +2,16 @@
 #ifndef QUAD_H
 #define QUAD_H
 
+#include <data.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
-#include <data.h>
 #include <stdlib.h>
-#include "table.h"
-#include "expr.h"
+#include <string.h>
 
+#include "expr.h"
+#include "symbol.h"
+#include "stmt.h"
+#include "table.h"
 
 // union generic_node{
 //     int
@@ -81,8 +83,6 @@ struct tmp {
   int value;
 };
 
-struct big_block typedef big_block;
-
 union generic_node {
   char* v;
   struct tmp* t;
@@ -94,7 +94,7 @@ struct gen_node_t {
   enum Q_TYPE type;
   union generic_node data;
   ast_sym_t* symbol;
-  //need a way to store symbol type
+  // need a way to store symbol type
 };
 
 struct quad {
@@ -125,17 +125,16 @@ struct big_block {
 
 } typedef big_block;
 
-
 // A linked list of
 struct CFG {
   big_block* block;
   struct CFG* true_exit;
   struct CFG* false_exit;
-  //bool term block?
+  // bool term block?
 };
 
-//As I don't have the symbol table to rely on, I'm doing this myself
-//This is just an API reference, actual implementation would be in the parser
+// As I don't have the symbol table to rely on, I'm doing this myself
+// This is just an API reference, actual implementation would be in the parser
 
 struct funct_decl {
   char* func_name;
@@ -152,6 +151,10 @@ struct funct_decl {
 // Count temps so they can tick up, clear when a single AST Node is complete
 
 big_block* new_block();
+
+struct big_block* descend_funct(struct ast_cpst* node, int func_count,
+                                ast_tab_t* table);
+
 struct big_block* descend_ast(ast_node* node, int* tmp_ctr, int* block_ctr,
                               big_block* parent);
 struct quad_ll* descend_expr_ast(ast_node* node, struct quad_ll* list,
