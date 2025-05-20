@@ -1,4 +1,5 @@
 #include "expr.h"
+extern char *filename;
 
 #define new_ast_node calloc(1, sizeof(struct ast_node))
 
@@ -55,7 +56,7 @@ ast_node* new_ast_list(ast_node* head){
 
 ast_node* append_ast_list(ast_node* root, ast_node* new){
   if(root->type != AST_list){
-    yyerror("List was not a list");
+    yyerror("%s:%d: Error: List was not a list", filename, root->line);
     exit(1);
   }
   struct list_node* head = root->obj.l;
@@ -108,7 +109,7 @@ ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op, cha
 
       // // hackier lvalue handling
       // if (expr1->is_lval != 1) {
-      //   yyerror("Expr1 in assignment not an lvalue");
+      //   yyerror("%s:%d: Error: Expr1 in assignment not an lvalue", filename, expr1->line);
       //   exit(1);
       // }
       break;
@@ -117,7 +118,7 @@ ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op, cha
       struct funct* function = calloc(1, sizeof(struct funct));
       function->name= expr1;
       if(expr2->type !=AST_list) {
-        yyerror("Function Call args are not of type list");
+        yyerror("%s:%d: Error: Function Call args are not of type list", filename, expr2->line);
         exit(1);
       }
       function->args = expr2->obj.l;
@@ -126,7 +127,7 @@ ast_node* new_ast_double(int type, ast_node* expr1, ast_node* expr2, int op, cha
       break;
 
     default:
-      yyerror("Not a real binop");
+      yyerror("%s:%d: Error: Not a real binop", expr1->line);
       exit(1);
       break;
   }
