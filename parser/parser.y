@@ -130,6 +130,8 @@ declaration_or_fndef:
 		curr = $1;
 		while (curr != NULL) {
 			switch (curr->stg_type) {
+				case STG_NA:
+					break;
 				case STG_EXTERN_EXP:
 				case STG_STATIC:
 					curr->stg_type = curr->stg_type;
