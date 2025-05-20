@@ -19,8 +19,8 @@ enum stg_type {
     STG_REGISTER = 8,
     STG_AUTO_LOC = 16,
     STG_AUTO_PAR = 32,
-    STG_TYPEDEF = 64,
-    STG_NA = 128
+    STG_NA = 64,
+    STG_TYPEDEF = 128
 };
 
 enum sym_type {

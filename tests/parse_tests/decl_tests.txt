@@ -21,11 +21,38 @@ static const struct doesnt_exist *jangler;
 int myFunc(int a, char, char *string);
 int myFunc(int i, char c, char *s) {
     int new_i, new_c;
+    c = 'b';
     c = 'a';
     {
         new_i = (c > 'A')? 0 : 1;
+        if (new_i) {
+            printf("true", new_i);
+        } else printf("false");
+
+        for (new_c = 0; new_c < 10; new_c++) new_i++;
+
+        while (1)
+            wait(1);
+        
+        extern int in_ece466;
+        do {
+            printf("making compiler...\n");
+        } while (in_ece466);
+
+        switch (i) {
+            case 136:
+            case 138:
+                printf("i is so close to 137!");
+                break;
+            case 137:
+                printf("yes! i = 137!");
+                break;
+            default:
+                printf("not even close... try again.");
+        }
     }
     char *const string;
+    return new_i;
 }
 
 struct nest {

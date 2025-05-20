@@ -5,14 +5,14 @@
 #include "symbol.h"
 
 enum stmt_type {
-    STMT_EXPR = 0, //
-    STMT_BLOCK, //
-    STMT_IF, // 
-    STMT_FOR, // 
-    STMT_WHILE, // 
-    STMT_DOWHILE, // 
-    STMT_CONTINUE, //
-    STMT_BREAK, //
+    STMT_EXPR = 0,
+    STMT_BLOCK,
+    STMT_IF,
+    STMT_FOR,
+    STMT_WHILE,
+    STMT_DOWHILE,
+    STMT_CONTINUE,
+    STMT_BREAK,
     STMT_SWITCH,
     STMT_CASE,
     STMT_DEFAULT,

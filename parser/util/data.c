@@ -1,5 +1,6 @@
 #include "data.h"
 #include "../parser.tab.h"
+extern char *filename;
 
 union ast_type *new_ast_scal(char unsign, char scal_type){
     struct ast_scal *scal;
@@ -35,7 +36,7 @@ union ast_type *new_ast_ary(TypedNumber size, ast_data_t *elem){
     if (size.type > TYPE_ULLI // floating point
     || (size.type % 2 == 0 && size.val.i < 0) // negative
     /*|| (unsigned long long) size.val.i >= some size limit?*/) {
-        // ERROR invalid array size
+        yyerror("%s: Error: Invalid array size.\n", filename);
     }
     ary->size = size.val.i;
 
@@ -216,7 +217,7 @@ ast_data_t *copy_ast_data(ast_data_t *data, int depth) {
 
 int comp_set_max(int *src, int *targ, char *warn) {
     if (*targ && *src && *targ != *src) {
-        /*ERROR incompatible types*/
+        yyerror("%s: Error: Incompatible types.\n", filename);
         return -1;
     } else if (*targ != *src) {
         *warn = 1;
@@ -237,14 +238,14 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
             if (old->data_type != DATA_SCAL
             || new->node->scal->scal_type != old->node->scal->scal_type
             || new->node->scal->unsign != old->node->scal->unsign) {
-                /*ERROR incompatible scalar types*/
+                yyerror("%s: Error: Incompatible scalar types.\n", filename);
                 return NULL;
             }
             break;
         case DATA_PTR:
             if (old->data_type != DATA_PTR
             || comb_ast_data(old->node->ptr->to, new->node->ptr->to) == NULL) {
-                /*ERROR incompatible pointer types*/
+                yyerror("%s: Error: Incompatible pointer types.\n", filename);
                 return NULL;
             }
             break;
@@ -252,21 +253,21 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
             if (old->data_type != DATA_ARY
             || comp_set_max(&old->node->ary->size, &new->node->ary->size, &warn) == -1
             || comb_ast_data(old->node->ary->elem, new->node->ary->elem) == NULL) {
-                /*ERROR incompatible array types*/
+                yyerror("%s: Error: Incompatible array types.\n", filename);
                 return NULL;
             }
             break;
         case DATA_FUNC: // h&s 5.11.4, prototype forms only
             if (old->data_type == DATA_FUNC
             && old->node->func->is_complete == 1) {
-                /*ERROR function already defined*/
+                yyerror("%s: Error: Function already defined.\n", filename);
                 return NULL;
             }
 
             if (old->data_type != DATA_FUNC
             || new->node->func->is_variadic != old->node->func->is_variadic
             || comb_ast_data(old->node->func->ret, new->node->func->ret) == NULL) {
-                /*ERROR incompatible function types*/
+                yyerror("%s: Error: Incompatible function types.\n", filename);
                 return NULL;
             }
 
@@ -275,7 +276,7 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
             while (old_param != NULL && new_param != NULL) {
                 comb_ast_data(old_param->data, new_param->data);
                 if (new_param->data == NULL) {
-                    /*ERROR incompatible parameter types*/
+                    yyerror("%s: Error: Incompatible parameter types.\n", filename);
                     return NULL;
                 }
                 new_param = new_param->prev;
@@ -283,32 +284,31 @@ ast_data_t *comb_ast_data(ast_data_t *old, ast_data_t *new) {
             }
 
             if (new_param != old_param) {
-                /*ERROR incompatible function types, different number of parameters*/
+                yyerror("%s: Error: Incompatible function types.\n", filename);
                 return NULL;
             }
             break;
         case DATA_PARAM:
             if (old->data_type != DATA_PARAM
             || comb_ast_data(old->node->param->is, new->node->param->is) == NULL) {
-                /*ERROR incompatible parameter types*/
                 return NULL;
             }
             break;
         case DATA_STRU:
             if (new->node->stru->tag != old->node->stru->tag) {
-                /*ERROR incompatible struct types*/
+                yyerror("%s: Error: Incompatible struct types.\n", filename);
                 return NULL;
             }
             break;
         case DATA_UNIO:
             if (new->node->unio->tag != old->node->unio->tag) {
-                /*ERROR incompatible union types*/
+                yyerror("%s: Error: Incompatible union types.\n", filename);
                 return NULL;
             }
             break;
         case DATA_ENU: // h&s 5.11.2
             if (new->node->enu->tag != old->node->enu->tag) {
-                /*ERROR conflicting enum types*/
+                yyerror("%s: Error: Incompatible enum types.\n", filename);
                 return NULL;
             }
             break;

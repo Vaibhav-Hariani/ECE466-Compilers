@@ -124,11 +124,6 @@ VOLATILE	WHILE	BOOL	COMPLEX	IMAGINARY
 %token <s> STRING;
 %start prog
 %%
-// 2 types of elements
-// expr, and lvalues
-// lvalues can be a type of expr, that reduce to an ident, or an address in memory
-// as such, they can be ternarys, pointers, or identifiers. Nothing else.
-//unops take in an lvalue, and do one of 3 operations to them.
 
 prog:
 	%empty	{$$ = NULL;}
@@ -142,6 +137,8 @@ declaration_or_fndef:
 		curr = $1;
 		while (curr != NULL) {
 			switch (curr->stg_type) {
+				case STG_NA:
+					break;
 				case STG_EXTERN_EXP:
 				case STG_STATIC:
 					curr->stg_type = curr->stg_type;
@@ -150,7 +147,7 @@ declaration_or_fndef:
 					curr->stg_type = STG_EXTERN_IMP;
 					break;
 				default:
-					/*ERROR invalid storage class specifier*/
+					yyerror("%s:%d: Error: Invalid storage class specifier for global declaration.\n", filename, @1.first_line);
 					curr->stg_type = STG_EXTERN_IMP;
 					break;
 			}
@@ -169,11 +166,11 @@ declaration_or_fndef:
 function_def: /*does not support k&r style*/
 	declaration_spec function_declarator compound_statement {
 		if ($1->data->qual != QUAL_NONE) {
-			/*ERROR qualifiers invalid*/
+			yyerror("%s:%d: Error: Function declaration should not have qualifiers.\n", filename, @1.first_line);
 		}
 
 		else if ($2->data->data_type != DATA_FUNC) {
-			/*ERROR expected a semicolon after declarator?*/
+			yyerror("%s:%d: Error: Expected semicolon after declarator.\n", filename, @1.first_line);
 		}
 
 		else {
@@ -186,7 +183,7 @@ function_def: /*does not support k&r style*/
 					$2->stg_type = STG_EXTERN_IMP;
 					break;
 				default:
-					/*ERROR invalid storage class specifier*/
+					yyerror("%s:%d: Error: Invalid storage class for function definition.\n", filename, @1.first_line);
 					$2->stg_type = STG_EXTERN_IMP;
 					break;
 			}
@@ -200,7 +197,7 @@ function_def: /*does not support k&r style*/
 					@3.last_line, 1);	// insert params
 				insert_list(tab, $3->sym, SCO_FUNC,
 					@3.last_line, 1);	// insert compound statement
-				print_stmt_list($3->stmt);
+				print_stmt_list($3->stmt, 0, $2->name);
 
 				// Entrypoint for quad gen
 				// If control flow was to be done,
@@ -274,7 +271,7 @@ statement:
 	}
 |	FOR '(' term_expr_opt ';' term_expr_opt ';' term_expr_opt ')' statement	{
 		$$ = new_ast_cpst(
-			new_ast_stmt(new_ast_for($3, $5, $7, $9->stmt), STMT_IF, NULL),
+			new_ast_stmt(new_ast_for($3, $5, $7, $9->stmt), STMT_FOR, NULL),
 			NULL);
 	}
 |	WHILE '(' term_expr ')' statement	{
@@ -282,7 +279,7 @@ statement:
 			new_ast_stmt(new_ast_while($3, $5->stmt), STMT_WHILE, NULL),
 			NULL);
 	}
-|	DO statement WHILE '(' term_expr ')'	{
+|	DO statement WHILE '(' term_expr ')' ';'	{
 		$$ = new_ast_cpst(
 			new_ast_stmt(new_ast_dowhile($5, $2->stmt), STMT_DOWHILE, NULL),
 			NULL);
@@ -411,8 +408,7 @@ declaration:
 
 		$$ = $2;
 		if ($1->data->data_type == DATA_NONE) {
-			fprintf(stderr, "%s:%d:Error: Must specify a scalar type.\n",
-				filename, @2.first_line);
+			yyerror("%s:%d: Error: Must specify a scalar type.\n", filename, @2.first_line);
 		}
 
 		curr = $$;
@@ -424,8 +420,7 @@ declaration:
 
 			if (curr->data->data_type == DATA_SCAL && curr->data->node->scal->scal_type == SCAL_VOID) {
 				// inadequate, allows void arrays
-				fprintf(stderr, "%s:%d:Error: Cannot have type void.\n",
-					filename, @2.first_line);
+				yyerror("%s:%d: Error: Cannot have type void.\n", filename, @2.first_line);
 			}
 			curr = curr->prev;
 		}
@@ -446,7 +441,7 @@ declaration_spec:
 |	type_spec untyped_declaration_spec	{
 		$$ = $2;
 		if ($$->data->data_type != DATA_NONE) {
-			/*ERROR can only have one type specifier*/
+			yyerror("%s:%d: Error: Can only have one type specifier.\n", filename, @1.first_line);
 		} else {
 			$1->data->qual = $$->data->qual;
 			del_ast_data($$->data);
@@ -457,7 +452,7 @@ declaration_spec:
 |	stgclass_spec declaration_spec {
 		$$ = $2;
 		if ($$->stg_type != STG_NONE && $$->stg_type != $1) {
-			/*ERROR*/
+			yyerror("%s:%d: Error: Conflicting storage class specifiers.\n", filename, @1.first_line);
 		} else {
 			$$->stg_type = $1;
 		}
@@ -473,7 +468,7 @@ declaration_spec:
 |	func_spec declaration_spec {
 		$$ = $2;
 		if ($$->sym_type != SYM_NONE && $$->sym_type != SYM_FUNC) {
-			/*ERROR*/
+			yyerror("%s:%d: Error: Can only declare functions as inline.\n", filename, @1.first_line);
 		} else {
 			$$->sym_type = SYM_FUNC;
 		}
@@ -483,7 +478,8 @@ declaration_spec:
 
 untyped_declaration_spec:
 	stgclass_spec	{
-		$$ = new_ast_sym(NULL, $1, SYM_NONE, NULL,
+		$$ = new_ast_sym(NULL, $1, SYM_NONE,
+			new_ast_data(0, DATA_NONE, QUAL_NONE, NULL),
 			strdup(filename), @1.first_line);
 		}
 |	qual_spec	{
@@ -500,7 +496,7 @@ untyped_declaration_spec:
 |	stgclass_spec untyped_declaration_spec {
 		$$ = $2;
 		if ($$->stg_type != STG_NONE && $$->stg_type != $1) {
-			/*ERROR*/
+			yyerror("%s:%d: Error: Conflicting storage class specifiers.\n", filename, @1.first_line);
 		} else {
 			$$->stg_type = $1;
 		}
@@ -516,7 +512,7 @@ untyped_declaration_spec:
 |	func_spec untyped_declaration_spec {
 		$$ = $2;
 		if ($$->sym_type != SYM_NONE && $$->sym_type != SYM_FUNC) {
-			/*ERROR*/
+			yyerror("%s:%d: Error: Can only declare functions as inline.\n", filename, @1.first_line);
 		} else {
 			$$->sym_type = SYM_FUNC;
 		}
@@ -814,18 +810,19 @@ component_declarator:
 |	declarator ':' NUM {$$ = $1;}
 ;
 
-// for casts and sizeof
-// type_name:
-// 	declaration_spec {
-// 		$$ = $1->data;
-// 		free($1);
-// 	}
-// |	declaration_spec abstract_declarator {
-// 		install_tail($2, $1->data);
-// 		free($1);
-// 		$$ = $2;
-// 	}
-// ;
+// for sizeof (type_name) and cast to type_name
+type_name:
+	declaration_spec {
+		$$ = $1->data;
+		free($1);
+	}
+|	declaration_spec abstract_declarator {
+		install_tail($2, $1->data);
+		free($1);
+		$$ = $2->data;
+		free($2);
+	}
+;
 
 // declarators
 
@@ -924,7 +921,7 @@ param_declaration:
 		} else {
 			$$->stg_type = STG_AUTO_PAR;
 			if ($1->stg_type != STG_NONE) {
-				/*ERROR invalid stg class for parameter*/
+				yyerror("%s:%d: Error: Invalid storage class for parameter.\n", filename, @1.first_line);
 			}
 		}
 		$$->sym_type = SYM_PARAM;
@@ -1040,7 +1037,24 @@ unop_expr:
 |	'&' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '&', PREFIX, strdup(filename), @2.first_line);}
 |	 '*' unop_expr %prec SIZEOF	{ $$ = new_ast_single($2, '*', PREFIX, strdup(filename), @2.first_line);}
 |	SIZEOF unop_expr	{$$ = new_ast_single($2, SIZEOF, PREFIX, strdup(filename), @2.first_line);}
+|	SIZEOF '(' type_name ')'	{
+		$$ = new_ast_num((TypedNumber) {{.i = $3->size}, TYPE_I}, strdup(filename), @1.first_line);
+		del_ast_data($3);
+	}
 ;
+
+/*
+typedef union {
+	long long int i;
+	long double f;
+} NumberValue;
+
+typedef struct {
+	NumberValue val;
+	char type;
+} TypedNumber;
+*/
+
 
 arg_list: %empty { $$ = new_ast_list(0);} 
 |   assign_expr { $$=new_ast_list($1);}
@@ -1097,7 +1111,6 @@ assign_expr:
 void yyerror(const char *format, ...){
 	va_list args;
 	va_start(args, format);
-	fprintf(stderr, "Error: ");
     vfprintf(stderr, format, args);
 	va_end(args);
 }
@@ -1111,7 +1124,7 @@ int main(int argc, char** argv){
         file = fopen(argv[1],"r");
 		filename = strdup(argv[1]);
         if(!file) {
-            yyerror("No valid file specified");
+        	fprintf(stderr, "No Valid File Specified \n");
             return 0;
         }
         yyin = file;

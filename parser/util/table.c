@@ -1,6 +1,7 @@
 #include "table.h"
 #include "../out/symtab_out.h"
 #include "../parser.tab.h"
+extern char *filename;
 
 int get_namespace(short sym_type) {
     switch (sym_type) {
@@ -56,7 +57,7 @@ void print_insertion(ast_sym_t *sym) {
             }
             break;
         default:
-            fprintf(stderr, "Error: Symbol type %d for symbol %s!\n", sym->sym_type, sym->name);
+            yyerror("%s:%d: Error: Unexpected type %d for symbol %s.\n", filename, sym->start, sym->sym_type, sym->name);
             break;
     }
 }
@@ -118,7 +119,7 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
     && sym->tail->node->sue->name != NULL) {
 
         if ((tag = resolve_tag(tab, sym)) == NULL) {
-            // ERROR unknown struct/union/enum type
+            yyerror("%s:%d: Error: Unknown struct/union/enum type.\n", filename, sym->start);
         } else if (((tag->sym_type == SYM_STRU_T
         && tag->data->node->stru->is_complete == 0)
         || (tag->sym_type == SYM_UNIO_T
@@ -127,7 +128,7 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
         && tag->data->node->enu->is_complete == 0))
         && ((head = get_tail_head(sym->data, sym->tail)) == NULL
         || head->data_type != DATA_PTR)) {
-            // ERROR struct/union/enum type incomplete
+            yyerror("%s:%d: Error: Incomplete struct/union/enum type.\n", filename, sym->start);
             return 3;
         }
     }
@@ -164,7 +165,7 @@ int insert(ast_tab_t *tab, ast_sym_t *sym, char sco_type, int end, char replace_
                 tab->filled--;
                 break;
             } else {
-                // ERROR symbol already defined, cant replace
+                yyerror("%s:%d: Error: %s already defined.\n", filename, sym->start, sym->name);
                 del_ast_sym(sym);
                 return 1;
             }
@@ -314,7 +315,7 @@ int rehash(ast_tab_t *tab) {
     old_size = tab->size;
     old_cells = calloc(old_size, sizeof (ast_cell_t *));
     if (errno != 0) {
-        /*ERROR out of memory*/
+        yyerror("%s: Error: Out of memory.\n", filename);
         return -1;
     }
 
@@ -333,13 +334,13 @@ int rehash(ast_tab_t *tab) {
     }
 
     if ((tab->size = sizeup(tab->size)) == -1) {
-        /*ERROR maximum size reached*/
+        yyerror("%s: Error: Maximum symbol table size reached.\n", filename);
         return -1;
     }
 
     tab->cells = reallocarray(tab->cells, tab->size, sizeof (ast_cell_t *));
     if (errno != 0) {
-        /*ERROR out of memory*/
+        yyerror("%s: Error: Out of memory.\n", filename);
         return -1;
     }
 

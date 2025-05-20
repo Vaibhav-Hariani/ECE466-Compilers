@@ -1,6 +1,7 @@
 #include "symbol.h"
 #include "yylval.h"
 #include "../parser.tab.h"
+extern char *filename;
 
 ast_sym_t *new_ast_sym(char *name, char stg_type, short sym_type,
         ast_data_t *data, char *filename, int start){
@@ -116,7 +117,7 @@ int get_align(ast_sym_t *memb, ast_sym_t *sym) {
             break;
         case DATA_STRU: case DATA_UNIO:
             if (!strcmp(memb->name, sym->name)) {
-                /*ERROR cannot be own type*/
+                yyerror("%s:%d: Error: Cannot contain own type.\n", filename, memb->start);
             }
 
         case DATA_ARY: // DATA_STRU and DATA_UNIO fall through
@@ -130,7 +131,7 @@ int get_align(ast_sym_t *memb, ast_sym_t *sym) {
             align = __alignof__ (int);
             break;
         default:
-            /*ERROR type not permitted as struct member*/
+            yyerror("%s:%d: Error: %s not permitted as struct member.\n", filename, memb->start, memb->name);
             break;
     }
 
